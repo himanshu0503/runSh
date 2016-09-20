@@ -161,11 +161,8 @@ MicroService.prototype.connectToQueue = function (next) {
         prefetchCount: 1
       };
 
-      // If this is running on a clusterNode, follow a different path.
-      if (this.clusterNodeId)
-        queue.subscribe(queueParams, this.disconnectAndProcess.bind(this));
-      else
-        queue.subscribe(queueParams, this.microWorker);
+      queue.subscribe(queueParams, this.disconnectAndProcess.bind(this));
+
       return next();
     }.bind(this)
   );

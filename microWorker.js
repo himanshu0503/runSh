@@ -35,7 +35,7 @@ var outMap = {
   image: require('./resources/image/outStep.js')
 };
 
-function microWorker(message, headers, deliveryInfo, ack) {
+function microWorker(message) {
   var bag = {
     builderApiToken: message.builderApiToken,
     inPayload: message.payload,
@@ -115,17 +115,12 @@ function microWorker(message, headers, deliveryInfo, ack) {
         logger.error(bag.who, util.format('Failed to process message'));
       else
         logger.info(bag.who, util.format('Successfully processed message'));
-      if (bag.clusterNodeId)
-        __restartExecContainer(bag);
-      else
-        ack.acknowledge();
+      __restartExecContainer(bag);
     }
   );
 }
 
 function _getClusterNode(bag, next) {
-  if (!bag.clusterNodeId) return next();
-
   var who = bag.who + '|' + _getClusterNode.name;
   logger.verbose(who, 'Inside');
 
@@ -152,8 +147,6 @@ function _getClusterNode(bag, next) {
 }
 
 function _publishJobNodeInfo(bag, next) {
-  if (!bag.clusterNodeId) return next();
-
   var who = bag.who + '|' + _publishJobNodeInfo.name;
   logger.verbose(who, 'Inside');
 
@@ -406,7 +399,6 @@ function _validateDependencies(bag, next) {
 function _updateClusterNodeIdInBuildJob(bag, next) {
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
-  if (!bag.clusterNodeId) return next();
 
   var who = bag.who + '|' + _updateClusterNodeIdInBuildJob.name;
   logger.verbose(who, 'Inside');
