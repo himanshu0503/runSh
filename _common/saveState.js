@@ -15,7 +15,7 @@ function saveState(externalBag, callback) {
     consoleAdapter: externalBag.consoleAdapter
   };
 
-  bag.who = util.format('stepExec|_common|%s', self.name);
+  bag.who = util.format('runSh|_common|%s', self.name);
   logger.verbose(bag.who, 'Inside');
 
 

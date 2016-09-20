@@ -8,7 +8,7 @@ function inStep(externalBag, dependency, buildInDir, callback) {
     consoleAdapter: externalBag.consoleAdapter
   };
 
-  bag.who = 'stepExec|_common|resources|dockerOptions|' + self.name;
+  bag.who = 'runSh|_common|resources|dockerOptions|' + self.name;
   logger.verbose(bag.who, 'Starting');
 
   async.series([

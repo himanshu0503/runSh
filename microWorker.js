@@ -78,7 +78,7 @@ function microWorker(message) {
   bag.consoleAdapter =
     new ConsoleAdapter(bag.builderApiToken, bag.buildJobId);
 
-  bag.who = util.format('stepExec|%s', self.name);
+  bag.who = util.format('runSh|%s', self.name);
   logger.info(bag.who, 'Inside');
 
   async.series([

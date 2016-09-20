@@ -11,7 +11,7 @@ function inStep(externalBag, dependency, buildInDir, callback) {
     consoleAdapter: externalBag.consoleAdapter
   };
 
-  bag.who = 'stepExec|_common|resources|image|' + self.name;
+  bag.who = 'runSh|_common|resources|image|' + self.name;
   logger.verbose(bag.who, 'Starting');
 
   async.series([
