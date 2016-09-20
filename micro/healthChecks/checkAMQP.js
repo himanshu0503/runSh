@@ -10,7 +10,7 @@ function amqpMonitor(params, callback) {
     rabbitMQ: {}
   };
 
-  bag.who = util.format('_global|_healthCheck|%s|msName:%s', self.name, msName);
+  bag.who = util.format('micro|_healthCheck|%s|msName:%s', self.name, msName);
   logger.verbose('Checking health of ', bag.who);
 
   async.series([

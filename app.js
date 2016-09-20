@@ -1,9 +1,8 @@
 'use strict';
 var checkHealth = require('./checkHealth.js');
 var microWorker = require('./microWorker.js');
-var stepExecMS = require('./_common/micro/MicroService.js');
-var setupMS = require('../_global/setupMS.js');
-var setupStepExec = require('./_common/setupStepExec.js');
+var runShMS = require('./micro/MicroService.js');
+var setupMS = require('./micro/setupMS.js');
 
 var msParams = {
   checkHealth: checkHealth,
@@ -11,14 +10,13 @@ var msParams = {
 };
 
 var params = {
-  msName: 'stepExec'
+  msName: 'runSh'
 };
 
 var consoleErrors = [];
 setupMS(params);
-setupStepExec();
 
-var who = util.format('stepExec|msName:%s', msName);
+var who = util.format('msName:%s', msName);
 logger.info(util.format('Checking system config for %s', who));
 
 if (!global.config.amqpUrl)
@@ -30,8 +28,11 @@ if (!global.config.amqpExchange)
 if (!global.config.apiUrl)
   consoleErrors.push(util.format('%s is missing: apiUrl', who));
 
-if (!global.config.jobType)
-  consoleErrors.push(util.format('%s is missing: jobType', who));
+if (!global.config.inputQueue)
+  consoleErrors.push(util.format('%s is missing: inputQueue', who));
+
+if (!global.config.clusterNodeId)
+  consoleErrors.push(util.format('%s is missing: clusterNodeId', who));
 
 if (consoleErrors.length > 0) {
   _.each(consoleErrors, function (err) {
@@ -44,4 +45,4 @@ if (consoleErrors.length > 0) {
 logger.info(util.format('system config checks for %s succeeded', who));
 
 // This is where micro service starts
-stepExecMS = new stepExecMS(msParams);
+runShMS = new runShMS(msParams);
