@@ -7,7 +7,7 @@ var uuid = require('node-uuid');
 var ShippableAdapter = require('./shippable/Adapter.js');
 
 function Adapter(apiToken, buildJobId) {
-  this.who = 'stepExec|_common|buildJobConsoleAdapter|buildJobId:' + buildJobId;
+  this.who = 'runSh|_common|buildJobConsoleAdapter|buildJobId:' + buildJobId;
   this.buildJobId = buildJobId;
   this.timestamp = new Date().getTime() * 1000;
   this.ShippableAdapter = new ShippableAdapter(apiToken);

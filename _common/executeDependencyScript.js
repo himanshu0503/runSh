@@ -17,7 +17,7 @@ function executeDependencyScript(externalBag, callback) {
     consoleAdapter: externalBag.consoleAdapter
   };
 
-  bag.who = 'stepExec|_common|' + self.name;
+  bag.who = 'runSh|_common|' + self.name;
   logger.verbose(bag.who, 'Starting');
 
   async.series([

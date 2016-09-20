@@ -18,7 +18,7 @@ function inStep(externalBag, dependency, buildInDir, callback) {
   bag.resourceDir = path.join(buildInDir, bag.dependency.name,
     bag.dependency.type);
 
-  bag.who = util.format('stepExec|resources|manifest|%s', self.name);
+  bag.who = util.format('runSh|resources|manifest|%s', self.name);
   logger.verbose(bag.who, 'Inside');
 
   async.series([

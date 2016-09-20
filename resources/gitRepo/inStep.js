@@ -18,7 +18,7 @@ function inStep(externalBag, dependency, buildInDir, callback) {
     consoleAdapter: externalBag.consoleAdapter
   };
 
-  bag.who = 'stepExec|_common|resources|gitRepo|' + self.name;
+  bag.who = 'runSh|_common|resources|gitRepo|' + self.name;
   logger.verbose(bag.who, 'Starting');
 
   bag.scriptPath =

@@ -9,7 +9,7 @@ var updateClusterNodeStatus = require('./_common/updateClusterNodeStatus.js');
 
 function checkHealth(callback) {
   var bag = {};
-  bag.who = util.format('stepExec|%s|msName:%s', self.name, msName);
+  bag.who = util.format('runSh|%s|msName:%s', self.name, msName);
   logger.verbose('Checking health of', bag.who);
 
   var params = {
