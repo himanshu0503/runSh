@@ -4,8 +4,8 @@ module.exports = self;
 
 var fs = require('fs-extra');
 var path = require('path');
-var Adapter = require('../_global/shippable/Adapter.js');
-var ConsoleAdapter = require('../_global/buildJobConsoleAdapter.js');
+var Adapter = require('./_common/shippable/Adapter.js');
+var ConsoleAdapter = require('./_common/buildJobConsoleAdapter.js');
 var saveState = require('./_common/saveState.js');
 var executeScript = require('./_common/executeScript.js');
 var getPreviousState = require('./_common/getPreviousState.js');

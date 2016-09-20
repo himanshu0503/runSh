@@ -2,8 +2,8 @@
 var self = checkHealth;
 module.exports = self;
 
-var checkAMQP = require('../_global/healthChecks/checkAMQP.js');
-var checkShippableApi = require('../_global/healthChecks/checkShippableApi.js');
+var checkAMQP = require('./micro/healthChecks/checkAMQP.js');
+var checkShippableApi = require('./micro/healthChecks/checkShippableApi.js');
 var validateClusterNode = require('./_common/validateClusterNode.js');
 var updateClusterNodeStatus = require('./_common/updateClusterNodeStatus.js');
 

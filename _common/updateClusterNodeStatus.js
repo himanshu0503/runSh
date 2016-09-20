@@ -3,8 +3,8 @@ var self = updateClusterNodeStatus;
 module.exports = self;
 
 var fs = require('fs-extra');
-var ShippableAdapter = require('../../_global/shippable/Adapter.js');
-var statusCodes = require('../../_global/statusCodes.js');
+var ShippableAdapter = require('./shippable/Adapter.js');
+var statusCodes = require('./statusCodes.js');
 
 function updateClusterNodeStatus(params, callback) {
   if (!config.clusterNodeId)

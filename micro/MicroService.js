@@ -4,7 +4,7 @@ module.exports = self;
 
 var amqp = require('amqp');
 var fs = require('fs-extra');
-var Adapter = require('../../../_global/shippable/Adapter.js');
+var Adapter = require('../_common/shippable/Adapter.js');
 
 function MicroService(params) {
   logger.info('Starting', msName);

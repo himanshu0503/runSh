@@ -2,13 +2,13 @@
 var self = checkShippableApi;
 module.exports = self;
 
-var adapter = require('../shippable/Adapter.js');
+var adapter = require('../../_common/shippable/Adapter.js');
 
 function checkShippableApi(params, callback) {
   var bag = {
     params: params
   };
-  bag.who = util.format('_global|_healthCheck|%s|msName:%s', self.name, msName);
+  bag.who = util.format('micro|_healthCheck|%s|msName:%s', self.name, msName);
   logger.verbose('Checking health of ', bag.who);
 
   async.series([
