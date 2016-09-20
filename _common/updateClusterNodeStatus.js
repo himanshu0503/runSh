@@ -7,9 +7,6 @@ var ShippableAdapter = require('./shippable/Adapter.js');
 var statusCodes = require('./statusCodes.js');
 
 function updateClusterNodeStatus(params, callback) {
-  if (!config.clusterNodeId)
-    return callback();
-
   var bag = {
     params: params,
     pidFileLocation: '/var/run/job.pid',

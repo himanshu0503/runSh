@@ -8,9 +8,6 @@ var ShippableAdapter = require('./shippable/Adapter.js');
 var VALIDATION_PERIOD = 2 * 60 * 1000; // 2 minutes
 
 function validateClusterNode(params, callback) {
-  if (!config.clusterNodeId)
-    return callback();
-
   var bag = {
     params: params
   };
