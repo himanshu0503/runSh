@@ -51,7 +51,6 @@ function microWorker(message) {
     },
     outputVersion: {},
     clusterNodeId: config.clusterNodeId,
-    runShJobType: 'runSh',
     builderApiAdapter: new Adapter(message.builderApiToken),
     containerAction: 'continue',
     dirsToBeCreated: []
@@ -1191,9 +1190,6 @@ function _getOutputVersion(bag, next) {
 
 function _destroyPIDFile(bag, next) {
   bag.consoleAdapter.openGrp('Updating Status');
-
-  if (bag.inPayload.type !== bag.runShJobType) return next();
-
   bag.consoleAdapter.openCmd('Removing PID File');
 
   var who = bag.who + '|' + _destroyPIDFile.name;
