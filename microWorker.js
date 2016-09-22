@@ -15,8 +15,10 @@ var inMap = {
   cluster: require('./resources/cluster/inStep.js'),
   deploy: require('./resources/deploy/inStep.js'),
   dockerOptions: require('./resources/dockerOptions/inStep.js'),
+  file: require('./resources/file/inStep.js'),
   gitRepo: require('./resources/gitRepo/inStep.js'),
   image: require('./resources/image/inStep.js'),
+  integration: require('./resources/integration/inStep.js'),
   kickStart: require('./resources/kickStart/inStep.js'),
   loadBalancer: require('./resources/loadBalancer/inStep.js'),
   manifest: require('./resources/manifest/inStep.js'),
@@ -27,8 +29,7 @@ var inMap = {
   runSh: require('./resources/runSh/inStep.js'),
   syncRepo: require('./resources/syncRepo/inStep.js'),
   trigger: require('./resources/trigger/inStep.js'),
-  version: require('./resources/version/inStep.js'),
-  integration: require('./resources/integration/inStep.js')
+  version: require('./resources/version/inStep.js')
 };
 
 var outMap = {
