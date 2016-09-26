@@ -34,7 +34,7 @@ var inMap = {
 
 var outMap = {
   image: require('./resources/image/outStep.js'),
-  file: require('./resources/file/outStep.js'),
+  file: require('./resources/file/outStep.js')
 };
 
 function microWorker(message) {

@@ -15,7 +15,7 @@ function outStep(externalBag, dependency, buildOutDir, callback) {
     propertyBag: {}
   };
 
-  bag.who = 'stepExec|_common|resources|file|' + self.name;
+  bag.who = 'runSh|resources|file|' + self.name;
   logger.verbose(bag.who, 'Starting');
 
   async.series([
