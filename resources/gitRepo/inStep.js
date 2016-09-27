@@ -84,6 +84,7 @@ function _injectDependencies(bag, next) {
   bag.dependency.cloneLocation = util.format('%s/%s/%s', bag.buildInDir,
     bag.dependency.name, bag.dependency.type);
   bag.dependency.commitSha = bag.dependency.version.versionName;
+  bag.dependency.shaData = bag.dependency.version.propertyBag.shaData;
 
   bag.consoleAdapter.publishMsg('Successfully injected dependencies');
   bag.consoleAdapter.closeCmd(true);
@@ -103,6 +104,18 @@ function _executeScript(bag, next) {
     builderApiAdapter: bag.builderApiAdapter,
     consoleAdapter: bag.consoleAdapter
   };
+
+  var provider = bag.dependency.propertyBag.normalizedRepo.repositoryProvider;
+
+  if (provider === 'github')
+    scriptBag.templatePath =
+      path.resolve(__dirname, 'templates/providers/_github.sh');
+  else if (provider === 'bitbucket' || provider === 'bitbucketServer')
+    scriptBag.templatePath =
+      path.resolve(__dirname, 'templates/providers/_bitbucket.sh');
+  else if (provider === 'gitlab')
+    scriptBag.templatePath =
+      path.resolve(__dirname, 'templates/providers/_gitlab.sh');
 
   executeDependencyScript(scriptBag,
     function (err) {

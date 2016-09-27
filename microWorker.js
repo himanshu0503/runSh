@@ -28,6 +28,7 @@ var inMap = {
   rSync: require('./resources/rSync/inStep.js'),
   runSh: require('./resources/runSh/inStep.js'),
   syncRepo: require('./resources/syncRepo/inStep.js'),
+  time: require('./resources/time/inStep.js'),
   trigger: require('./resources/trigger/inStep.js'),
   version: require('./resources/version/inStep.js')
 };
