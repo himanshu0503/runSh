@@ -1,5 +1,5 @@
 'use strict';
-var self = validateClusterNode;
+var self = validateNode;
 module.exports = self;
 
 var fs = require('fs-extra');
@@ -7,24 +7,26 @@ var exec = require('child_process').exec;
 var ShippableAdapter = require('./shippable/Adapter.js');
 var VALIDATION_PERIOD = 2 * 60 * 1000; // 2 minutes
 
-function validateClusterNode(params, callback) {
+function validateNode(params, callback) {
   var bag = {
-    params: params
+    params: params,
+    isSystemNode: false
   };
 
   bag.who = util.format('_common|%s|msName:%s', self.name, msName);
-  logger.verbose('Validating cluster node status of clusterNodeId: %s',
-    config.clusterNodeId);
+  logger.verbose('Validating node status of nodeId: %s',
+    config.nodeId);
 
   async.series([
       _checkInputParams.bind(null, bag),
-      _validateClusterNodeStatusPeriodically.bind(null, bag)
+      _validateClusterNodeStatusPeriodically.bind(null, bag),
+      _validateSystemNodeStatusPeriodically.bind(null, bag)
     ],
     function (err) {
       if (err)
-        logger.error(bag.who, 'Failed to validate cluster node status');
+        logger.error(bag.who, 'Failed to validate node status');
       else
-        logger.verbose(bag.who, 'Successfully validated cluster node status');
+        logger.verbose(bag.who, 'Successfully validated node status');
       return callback(err);
     }
   );
@@ -36,6 +38,9 @@ function _checkInputParams(bag, next) {
 
   var consoleErrors = [];
   bag.adapter = new ShippableAdapter('');
+
+  if (global.config.nodeTypeCode === global.nodeTypeCodes['system'])
+    bag.isSystemNode = true;
 
   if (consoleErrors.length > 0) {
     _.each(consoleErrors,
@@ -49,6 +54,7 @@ function _checkInputParams(bag, next) {
 }
 
 function _validateClusterNodeStatusPeriodically(bag, next) {
+  if (bag.isSystemNode) return next();
   var who = bag.who + '|' + _validateClusterNodeStatusPeriodically.name;
   logger.debug(who, 'Inside');
 
@@ -61,16 +67,30 @@ function _validateClusterNodeStatusPeriodically(bag, next) {
   return next();
 }
 
+function _validateSystemNodeStatusPeriodically(bag, next) {
+  if (!bag.isSystemNode) return next();
+  var who = bag.who + '|' + _validateSystemNodeStatusPeriodically.name;
+  logger.debug(who, 'Inside');
+
+  setInterval(
+    function() {
+      __validateSystemNode(bag);
+    },
+    VALIDATION_PERIOD
+  );
+  return next();
+}
+
 function __validateClusterNode(innerBag) {
   var who = innerBag.who + '|' + __validateClusterNode.name;
   logger.debug(who, 'Inside');
 
-  innerBag.adapter.validateClusterNodeById(config.clusterNodeId,
+  innerBag.adapter.validateClusterNodeById(config.nodeId,
     function (err, clusterNode) {
       if (err) {
         logger.warn(who,
           util.format('Failed to :validateClusterNodeById for' +
-            'clusterNodeId: %s', config.clusterNodeId), err
+            'clusterNodeId: %s', config.nodeId), err
         );
       }
 
@@ -98,7 +118,7 @@ function __validateClusterNode(innerBag) {
           else
             logger.debug(who,
               util.format('clusterNodeId:%s action is %s, doing nothing',
-                config.clusterNodeId, clusterNode.action)
+                config.nodeId, clusterNode.action)
             );
         }
       );
@@ -106,6 +126,50 @@ function __validateClusterNode(innerBag) {
   );
 }
 
+function __validateSystemNode(innerBag) {
+  var who = innerBag.who + '|' + __validateSystemNode.name;
+  logger.debug(who, 'Inside');
+
+  innerBag.adapter.validateSystemNodeById(config.nodeId,
+    function (err, systemNode) {
+      if (err) {
+        logger.warn(who,
+          util.format('Failed to :validateSystemNodeById for' +
+            'systemNodeId: %s', config.nodeId), err
+        );
+      }
+
+      if (systemNode.action === 'continue')
+        innerBag.skipAllSteps = true;
+      else
+        innerBag.skipAllSteps = false;
+
+      innerBag.action = systemNode.action;
+      innerBag.pidFileLocation = '/var/run/job.pid';
+      innerBag.destroyPIDFile = false;
+
+      async.series([
+          __readPIDFile.bind(null, innerBag),
+          __destroyPIDFile.bind(null, innerBag),
+          __restartExecContainer.bind(null, innerBag),
+          __stopExecContainer.bind(null, innerBag)
+        ],
+        function(err) {
+          if (err)
+            logger.warn(
+              util.format('Unable to perform %s with err:%s', innerBag.action,
+                err)
+            );
+          else
+            logger.debug(who,
+              util.format('SystemNodeId:%s action is %s, doing nothing',
+                config.nodeId, clusterNode.action)
+            );
+        }
+      );
+    }
+  );
+}
 function __readPIDFile(bag, next) {
   if (bag.skipAllSteps) return next();
 
@@ -115,7 +179,7 @@ function __readPIDFile(bag, next) {
   fs.readFile(bag.pidFileLocation,
     function(err, data) {
       var shippableExecContainerName = 'shippable-exec-' +
-        config.clusterNodeId;
+        config.nodeId;
       if (data && data.toString() === shippableExecContainerName)
         bag.destroyPIDFile = true;
       return next();

@@ -4,8 +4,8 @@ module.exports = self;
 
 var checkAMQP = require('./micro/healthChecks/checkAMQP.js');
 var checkShippableApi = require('./micro/healthChecks/checkShippableApi.js');
-var validateClusterNode = require('./_common/validateClusterNode.js');
-var updateClusterNodeStatus = require('./_common/updateClusterNodeStatus.js');
+var validateNode = require('./_common/validateNode.js');
+var updateNodeStatus = require('./_common/updateNodeStatus.js');
 
 function checkHealth(callback) {
   var bag = {};
@@ -20,8 +20,8 @@ function checkHealth(callback) {
   async.series([
       checkAMQP.bind(null, params),
       checkShippableApi.bind(null, params),
-      updateClusterNodeStatus.bind(null, params),
-      validateClusterNode.bind(null, params)
+      updateNodeStatus.bind(null, params),
+      validateNode.bind(null, params)
     ],
     function (err) {
       if (err)

@@ -31,8 +31,11 @@ if (!global.config.apiUrl)
 if (!global.config.inputQueue)
   consoleErrors.push(util.format('%s is missing: inputQueue', who));
 
-if (!global.config.clusterNodeId)
-  consoleErrors.push(util.format('%s is missing: clusterNodeId', who));
+if (!global.config.nodeId)
+  consoleErrors.push(util.format('%s is missing: nodeId', who));
+
+if (!global.config.nodeTypeCode)
+  consoleErrors.push(util.format('%s is missing: nodeTypeCode', who));
 
 if (consoleErrors.length > 0) {
   _.each(consoleErrors, function (err) {

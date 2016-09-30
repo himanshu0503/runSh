@@ -108,6 +108,14 @@ ShippableAdapter.prototype.getSystemCodes =
     );
   };
 
+ShippableAdapter.prototype.getSystemNodeById =
+  function(systemNodeId, callback) {
+    this.get(
+      util.format('/systemNodes/%s', systemNodeId),
+      callback
+    );
+  };
+
 ShippableAdapter.prototype.postVersion =
   function (json, callback) {
     this.post(
@@ -215,6 +223,23 @@ ShippableAdapter.prototype.validateClusterNodeById =
   function (clusterNodeId, callback) {
     this.get(
       util.format('/clusterNodes/%s/validate', clusterNodeId),
+      callback
+    );
+  };
+
+ShippableAdapter.prototype.putSystemNodeById =
+  function (systemNodeId, systemNode, callback) {
+    this.put(
+      util.format('/systemNodes/%s', systemNodeId),
+      systemNode,
+      callback
+    );
+  };
+
+ShippableAdapter.prototype.validateSystemNodeById =
+  function (systemNodeId, callback) {
+    this.get(
+      util.format('/systemNodes/%s/validate', systemNodeId),
       callback
     );
   };
