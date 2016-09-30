@@ -53,9 +53,10 @@ function microWorker(message) {
       NOTIFY: 'NOTIFY'
     },
     outputVersion: {},
-    clusterNodeId: config.clusterNodeId,
+    nodeId: config.nodeId,
     builderApiAdapter: new Adapter(message.builderApiToken),
     containerAction: 'continue',
+    isSystemNode: false,
     dirsToBeCreated: []
   };
   // Setting Paths for get/put root directories
@@ -69,6 +70,9 @@ function microWorker(message) {
   bag.stepMessageFilename = 'version.json';
   bag.subPrivateKeyPath = '/tmp/00_sub';
   bag.runShName = 'runSh';
+
+  if (global.config.nodeTypeCode === global.nodeTypeCodes['system'])
+    bag.isSystemNode = true;
 
   // Push all the directories to be created in this array
   bag.dirsToBeCreated.push(bag.buildRootDir, bag.inRootDir,
@@ -85,12 +89,13 @@ function microWorker(message) {
 
   async.series([
       _getClusterNode.bind(null, bag),
+      _getSystemNode.bind(null, bag),
       _publishJobNodeInfo.bind(null, bag),
       _getSystemCodes.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
-      _updateClusterNodeIdInBuildJob.bind(null, bag),
+      _updateNodeIdInBuildJob.bind(null, bag),
       _getBuildJobPropertyBag.bind(null, bag),
       _removeBuildDirectory.bind(null, bag),
       _createDirectories.bind(null, bag),
@@ -123,13 +128,14 @@ function microWorker(message) {
 }
 
 function _getClusterNode(bag, next) {
+  if (bag.isSystemNode) return next();
   var who = bag.who + '|' + _getClusterNode.name;
   logger.verbose(who, 'Inside');
 
   bag.consoleAdapter.openGrp('Job Node Info');
   bag.consoleAdapter.openCmd('Node provision time');
 
-  bag.builderApiAdapter.getClusterNodeById(bag.clusterNodeId,
+  bag.builderApiAdapter.getClusterNodeById(bag.nodeId,
     function (err, clusterNode) {
       if (err) {
         bag.consoleAdapter.publishMsg(util.inspect(err));
@@ -138,7 +144,34 @@ function _getClusterNode(bag, next) {
         return next(true);
       } else {
         var msg = util.format('Node %s provisioned at %s',
-          bag.clusterNodeId, new Date(clusterNode.provisionedAt));
+          bag.nodeId, new Date(clusterNode.provisionedAt));
+
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(true);
+        return next();
+      }
+    }
+  );
+}
+
+function _getSystemNode(bag, next) {
+  if (!bag.isSystemNode) return next();
+  var who = bag.who + '|' + _getSystemNode.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openGrp('Job Node Info');
+  bag.consoleAdapter.openCmd('Node provision time');
+
+  bag.builderApiAdapter.getSystemNodeById(bag.nodeId,
+    function (err, systemNode) {
+      if (err) {
+        bag.consoleAdapter.publishMsg(util.inspect(err));
+        bag.consoleAdapter.closeCmd(false);
+        bag.consoleAdapter.closeGrp(false);
+        return next(true);
+      } else {
+        var msg = util.format('Node %s provisioned at %s',
+          bag.nodeId, new Date(systemNode.provisionedAt));
 
         bag.consoleAdapter.publishMsg(msg);
         bag.consoleAdapter.closeCmd(true);
@@ -398,16 +431,16 @@ function _validateDependencies(bag, next) {
   return next();
 }
 
-function _updateClusterNodeIdInBuildJob(bag, next) {
+function _updateNodeIdInBuildJob(bag, next) {
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
-  var who = bag.who + '|' + _updateClusterNodeIdInBuildJob.name;
+  var who = bag.who + '|' + _updateNodeIdInBuildJob.name;
   logger.verbose(who, 'Inside');
-  bag.consoleAdapter.openCmd('Updating cluster node');
+  bag.consoleAdapter.openCmd('Updating node');
 
   var update = {
-    nodeId: bag.clusterNodeId
+    nodeId: bag.nodeId
   };
 
   bag.builderApiAdapter.putBuildJobById(bag.buildJobId, update,

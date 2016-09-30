@@ -13,9 +13,14 @@ function MicroService(params) {
   this.timeoutLimit = 180;
   this.checkHealth = params.checkHealth;
   this.microWorker = params.microWorker;
-  this.clusterNodeId = config.clusterNodeId;
+  this.nodeId = config.nodeId;
   this.pidFile = config.pidFile;
   this.publicAdapter = new Adapter('');
+  this.isSystemNode = false;
+
+  if (config.nodeTypeCode === nodeTypeCodes['system'])
+    this.isSystemNode = true;
+
   return this.init();
 }
 
@@ -172,6 +177,7 @@ MicroService.prototype.disconnectAndProcess =
   function (message, headers, deliveryInfo, ack) {
     async.series([
         this.validateClusterNode.bind(this),
+        this.validateSystemNode.bind(this),
         this.checkPIDFile.bind(this),
         this.createPIDFile.bind(this),
       ],
@@ -189,16 +195,17 @@ MicroService.prototype.disconnectAndProcess =
   };
 
 MicroService.prototype.validateClusterNode = function(next) {
+  if (this.isSystemNode) return next();
   logger.verbose(
-    util.format('Validating cluster node with :id %s'), this.clusterNodeId
+    util.format('Validating cluster node with :id %s'), this.nodeId
   );
 
-  this.publicAdapter.validateClusterNodeById(this.clusterNodeId,
+  this.publicAdapter.validateClusterNodeById(this.nodeId,
     function (err, clusterNode) {
       if (err) {
         logger.warn(
           util.format('Failed to :validateClusterNodeById for id: %s',
-            this.clusterNodeId)
+            this.nodeId)
         );
         return next(true);
       }
@@ -210,6 +217,31 @@ MicroService.prototype.validateClusterNode = function(next) {
     }
   );
 };
+
+MicroService.prototype.validateSystemNode = function(next) {
+  if (!this.isSystemNode) return next();
+  logger.verbose(
+    util.format('Validating sytem node with :id %s'), this.nodeId
+  );
+
+  this.publicAdapter.validateSystemNodeById(this.nodeId,
+    function (err, systemNode) {
+      if (err) {
+        logger.warn(
+          util.format('Failed to :validateSystemNodeById for id: %s',
+            this.nodeId)
+        );
+        return next(true);
+      }
+
+      if (systemNode.action === 'continue')
+        return next();
+      else
+        return next(true);
+    }
+  );
+};
+
 
 MicroService.prototype.checkPIDFile = function(next) {
   logger.verbose('Checking existance of PID file');
@@ -228,7 +260,7 @@ MicroService.prototype.checkPIDFile = function(next) {
 MicroService.prototype.createPIDFile = function(next) {
   logger.verbose('Creating PID file');
 
-  var execContainerName = util.format('shippable-exec-%s', this.clusterNodeId);
+  var execContainerName = util.format('shippable-exec-%s', this.nodeId);
   fs.outputFile(this.pidFile, execContainerName,
     function(err) {
       if (err) {
