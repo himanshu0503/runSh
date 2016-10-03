@@ -28,7 +28,7 @@ function setupMS(params) {
   global.config.apiUrl = process.env.SHIPPABLE_API_URL;
   global.config.inputQueue = process.env.LISTEN_QUEUE;
   global.config.amqpUrl = process.env.SHIPPABLE_AMQP_URL;
-  global.config.nodeId = process.env.CLUSTER_NODE_ID;
+  global.config.nodeId = process.env.NODE_ID;
   global.config.nodeTypeCode = process.env.NODE_TYPE_CODE || 7001;
   global.config.pidFile = '/var/run/job.pid';
 
