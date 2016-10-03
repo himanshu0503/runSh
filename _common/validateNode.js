@@ -163,7 +163,7 @@ function __validateSystemNode(innerBag) {
           else
             logger.debug(who,
               util.format('SystemNodeId:%s action is %s, doing nothing',
-                config.nodeId, clusterNode.action)
+                config.nodeId, systemNode.action)
             );
         }
       );
