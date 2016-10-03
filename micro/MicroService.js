@@ -18,7 +18,7 @@ function MicroService(params) {
   this.publicAdapter = new Adapter('');
   this.isSystemNode = false;
 
-  if (config.nodeTypeCode === nodeTypeCodes['system'])
+  if (parseInt(config.nodeTypeCode) === nodeTypeCodes['system'])
     this.isSystemNode = true;
 
   return this.init();
