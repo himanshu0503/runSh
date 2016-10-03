@@ -71,7 +71,7 @@ function microWorker(message) {
   bag.subPrivateKeyPath = '/tmp/00_sub';
   bag.runShName = 'runSh';
 
-  if (global.config.nodeTypeCode === global.nodeTypeCodes['system'])
+  if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes['system'])
     bag.isSystemNode = true;
 
   // Push all the directories to be created in this array

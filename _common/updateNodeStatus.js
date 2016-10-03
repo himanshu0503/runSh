@@ -41,7 +41,7 @@ function _checkInputParams(bag, next) {
   var consoleErrors = [];
   bag.adapter = new ShippableAdapter('');
 
-  if (global.config.nodeTypeCode === global.nodeTypeCodes['system'])
+  if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes['system'])
     bag.isSystemNode = true;
 
   if (consoleErrors.length > 0) {
