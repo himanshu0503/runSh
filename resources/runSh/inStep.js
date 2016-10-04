@@ -12,7 +12,8 @@ function inStep(externalBag, dependency, buildInDir, callback) {
     builderApiAdapter: externalBag.builderApiAdapter,
     resourceId: dependency.resourceId,
     tempDir: '/tmp/',
-    consoleAdapter: externalBag.consoleAdapter
+    consoleAdapter: externalBag.consoleAdapter,
+    outputFileJSON: []
   };
 
   bag.resourceDir = path.join(buildInDir, bag.dependency.name,
@@ -76,8 +77,8 @@ function _getFiles(bag, next) {
         msg = util.format('%s :getFilesByResourceId failed for ' +
           'resourceId: %s with error %s', who, bag.resourceId, err);
         bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(false);
-        return next(true);
+        bag.consoleAdapter.closeCmd(true);
+        return next();
       }
       bag.outputFileJSON = data;
       if (_.isEmpty(bag.outputFileJSON))
