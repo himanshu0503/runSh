@@ -107,6 +107,7 @@ function microWorker(message) {
       _saveStepMessage.bind(null, bag),
       _sendStartMessage.bind(null, bag),
       _handleSteps.bind(null, bag),
+      _getLatestBuildJobStatus.bind(null, bag),
       _persistPreviousStateOnFailure.bind(null, bag),
       _saveStepState.bind(null, bag),
       _getOutputVersion.bind(null, bag),
@@ -330,9 +331,8 @@ function _getBuildJobStatus(bag, next) {
       bag.isCancelled = false;
       if (buildJob.statusCode === __getStatusCodeByName(bag, 'cancelled')) {
         bag.isCancelled = true;
-        var msg = util.format('%s, Job with buildJobId:%s' +
-          ' is cancelled', who, bag.buildJobId);
-        logger.warn(msg);
+        logger.warn(util.format('%s, Job with buildJobId:%s' +
+          ' is cancelled', who, bag.buildJobId));
       }
       return next();
     }
@@ -1132,6 +1132,29 @@ function __executeManagedTask(bag, dependency, next) {
         //so we need to explicitly tell that it failed
         bag.managedTaskFailed = true;
         bag.isGrpSuccess = false;
+      }
+      return next();
+    }
+  );
+}
+
+function _getLatestBuildJobStatus(bag, next) {
+  var who = bag.who + '|' + _getLatestBuildJobStatus.name;
+  logger.verbose(who, 'Inside');
+
+  bag.builderApiAdapter.getBuildJobById(bag.buildJobId,
+    function (err, buildJob) {
+      if (err) {
+        var msg = util.format('%s, Failed to get buildJob' +
+          ' for buildJobId:%s, with err: %s', who, bag.buildJobId, err);
+        logger.warn(msg);
+        bag.jobStatusCode = __getStatusCodeByName(bag, 'error');
+      }
+
+      if (buildJob.statusCode === __getStatusCodeByName(bag, 'cancelled')) {
+        bag.isCancelled = true;
+        logger.warn(util.format('%s, Job with buildJobId:%s' +
+          ' is cancelled', who, bag.buildJobId));
       }
       return next();
     }
