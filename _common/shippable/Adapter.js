@@ -359,8 +359,10 @@ function _performCall(bag, next) {
         if ((res && res.statusCode > 299) || err) {
           if (res && res.statusCode >= 500) {
             logger.error(
-              util.format('%s returned error. Retrying in %s seconds',
-                bag.who, bag.timeoutLength*2)
+              util.format('%s returned status %s with error %s. ' +
+                'Retrying in %s seconds',
+                bag.who, res && res.statusCode, err, bag.timeoutLength * 2
+              )
             );
             bag.timeoutLength *= 2;
             if (bag.timeoutLength > bag.timeoutLimit)
