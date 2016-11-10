@@ -5,7 +5,7 @@ export BRANCH=master
 
 export RES_MICRO_IMAGE=microbase-img
 
-export RES_OLD_HUB_CREDS=docker-creds
+export RES_OLD_HUB_CREDS=shipimg-dockerhub
 export OLD_IMAGE_NAME=shipimg/runsh
 export OLD_IMAGE_TAG=$BRANCH.$BUILD_NUMBER
 export RES_OLD_IMAGE=runSh-img
