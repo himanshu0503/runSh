@@ -107,6 +107,7 @@ function microWorker(message) {
       _saveStepMessage.bind(null, bag),
       _sendStartMessage.bind(null, bag),
       _handleSteps.bind(null, bag),
+      _createComposition.bind(null, bag),
       _getLatestBuildJobStatus.bind(null, bag),
       _persistPreviousStateOnFailure.bind(null, bag),
       _saveStepState.bind(null, bag),
@@ -871,6 +872,24 @@ function _handleSteps(bag, next) {
   );
 }
 
+function _createComposition(bag, next) {
+  if (!_.isArray(bag.inPayload.dependencies)) return next();
+
+  var who = bag.who + '|' + _createComposition.name;
+  logger.verbose(who, 'Inside');
+
+  bag.composition = _.map(bag.inPayload.dependencies,
+    function (dependency) {
+      return {
+        versionId: dependency.version && dependency.version.versionId,
+        name: dependency.name
+      };
+    }
+  );
+
+  return next();
+}
+
 function __handleDependency(bag, dependency, next) {
   // We don't know where the group will end so need a flag
   bag.isGrpSuccess = true;
@@ -1374,6 +1393,7 @@ function _updateResourceVersion(bag, next) {
     _.extend(resource,  bag.outputVersion);
 
   resource.propertyBag.sha = bag.versionSha;
+  resource.propertyBag.composition = bag.composition;
 
   var msg;
   bag.builderApiAdapter.postVersion(resource,
