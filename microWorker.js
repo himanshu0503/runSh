@@ -396,8 +396,8 @@ function _validateDependencies(bag, next) {
       if (_.isObject(dependency.version)) {
         if (!dependency.version.versionId)
           dependencyErrors.push(
-            util.format('%s, %s dependency is missing :type', who,
-              dependency.name)
+            util.format('%s, %s dependency is missing :version.versionId',
+              who, dependency.name)
           );
 
         if (!_.isObject(dependency.version.propertyBag))
