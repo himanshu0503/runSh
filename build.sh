@@ -48,6 +48,12 @@ dockerBuild() {
   echo "Completed Docker build for" $HUB_LOC/$DEF_IMAGE_NAME:$DEF_IMAGE_TAG
 }
 
+delete_untagged_images() {
+  echo "Starting deleting of untagged images"
+  aws ecr list-images --repository-name $DEF_IMAGE_NAME --query 'imageIds[?type(imageTag)!=`string`].[imageDigest]' --output text | while read line; do aws ecr batch-delete-image --repository-name $DEF_IMAGE_NAME --image-ids imageDigest=$line; done
+  echo "Completed deleting all untagged images"
+}
+
 ecrPush() {
   echo "Starting Docker push for" $HUB_LOC/$DEF_IMAGE_NAME:$DEF_IMAGE_TAG
   sudo docker push $HUB_LOC/$DEF_IMAGE_NAME:$DEF_IMAGE_TAG
@@ -65,6 +71,7 @@ main() {
   configure_aws
   ecr_login
   dockerBuild
+  delete_untagged_images
   ecrPush
   createOutState
 }
