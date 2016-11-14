@@ -1,17 +1,16 @@
 #!/bin/bash -e
 
 export RES_REPO=runSh-repo
-export BRANCH=master
 
 export RES_MICRO_IMAGE=microbase-img
 
 export HUB_REGION=us-east-1
 export HUB_LOC=374168611083.dkr.ecr.$HUB_REGION.amazonaws.com
-export RES_DEF_HUB_CREDS=shipbits-ecr
+export RES_HUB_CREDS=shipbits-ecr
 
 export DEF_IMAGE_NAME=runsh
 export DEF_IMAGE_TAG=latest
-export RES_DEF_IMAGE=runSh-def-img
+export RES_IMAGE=runSh-img
 
 findUpstreamMicroBaseVersion() {
   echo "Find Latest Version for" $RES_MICRO_IMAGE
@@ -20,7 +19,7 @@ findUpstreamMicroBaseVersion() {
 }
 
 configure_aws() {
-  creds_path="./IN/$RES_DEF_HUB_CREDS/integration.env"
+  creds_path="./IN/$RES_HUB_CREDS/integration.env"
   if [ ! -e $creds_path ]; then
     echo "No credentials file found at location: $creds_path"
     return 1
@@ -56,9 +55,9 @@ ecrPush() {
 }
 
 createOutState() {
-  echo "Creating a state file for" $RES_DEF_IMAGE
-  echo versionName=$DEF_IMAGE_TAG > /build/state/$RES_DEF_IMAGE.env
-  echo "Completed creating a state file for" $RES_DEF_IMAGE
+  echo "Creating a state file for" $RES_IMAGE
+  echo versionName=$DEF_IMAGE_TAG > /build/state/$RES_IMAGE.env
+  echo "Completed creating a state file for" $RES_IMAGE
 }
 
 main() {
