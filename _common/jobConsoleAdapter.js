@@ -21,9 +21,13 @@ function Adapter(apiToken, jobId) {
   this.pendingApiCalls = 0;
 }
 
-Adapter.prototype.openGrp = function (consoleGrpName) {
+Adapter.prototype.openGrp = function (consoleGrpName, isShown) {
   var that = this;
   var who = that.who + '|_openGrp';
+
+  // By default we will display the group
+  if (!_.isBoolean(isShown))
+    isShown = true;
 
   that.consoleGrpName = consoleGrpName;
   that.consoleGrpId = uuid.v4();
@@ -39,7 +43,7 @@ Adapter.prototype.openGrp = function (consoleGrpName) {
     type: 'grp',
     message: that.consoleGrpName,
     timestamp: that._getTimestamp(),
-    isShown: true
+    isShown: isShown
   };
 
   that.buffer.push(consoleGrp);
