@@ -88,7 +88,7 @@ function __postNodeStats(innerBag) {
   );
 }
 
-function __checkActiveContainers(bag, next) {
+function __checkActiveContainers(bag, done) {
   var who = bag.who + '|' + __checkActiveContainers.name;
   logger.debug(who, 'Inside');
 
@@ -96,14 +96,14 @@ function __checkActiveContainers(bag, next) {
   exec(command,
     function (err, stdout) {
       if (err)
-        return next(err);
-      bag.activeContainersCount = parseInt(stdout);
-      return next();
+        return done(err);
+      bag.activeContainersCount = parseInt(stdout) - 1;
+      return done();
     }
   );
 }
 
-function __checkTotalContainers(bag, next) {
+function __checkTotalContainers(bag, done) {
   var who = bag.who + '|' + __checkTotalContainers.name;
   logger.debug(who, 'Inside');
 
@@ -111,14 +111,14 @@ function __checkTotalContainers(bag, next) {
   exec(command,
     function (err, stdout) {
       if (err)
-        return next(err);
-      bag.totalContainersCount = parseInt(stdout);
-      return next();
+        return done(err);
+      bag.totalContainersCount = parseInt(stdout) - 1;
+      return done();
     }
   );
 }
 
-function __checkMemoryUsage(bag, next) {
+function __checkMemoryUsage(bag, done) {
   var who = bag.who + '|' + __checkMemoryUsage.name;
   logger.debug(who, 'Inside');
 
@@ -126,37 +126,37 @@ function __checkMemoryUsage(bag, next) {
   var freeMem = os.freemem();
 
   bag.memoryUsageInPercentage = (totalMem - freeMem) * 100 / totalMem;
-  return next();
+  return done();
 }
 
-function __checkCpuUsage(bag, next) {
+function __checkCpuUsage(bag, done) {
   var who = bag.who + '|' + __checkCpuUsage.name;
   logger.debug(who, 'Inside');
 
   bag.cpuLoadInPercentage = _.first(os.loadavg()) * 100;
-  return next();
+  return done();
 }
 
-function __checkDiskUsage(bag, next) {
+function __checkDiskUsage(bag, done) {
   var who = bag.who + '|' + __checkDiskUsage.name;
   logger.debug(who, 'Inside');
 
   diskUsage.check('/',
     function(err, info) {
       if (err)
-        return next(err);
+        return done(err);
       var freeDiskInBytes = info.free;
       var totalDiskInBytes = info.total;
 
       bag.diskUsageInPercentage =
         (totalDiskInBytes - freeDiskInBytes) * 100 /totalDiskInBytes;
-      return next();
+      return done();
     }
   );
 }
 
-function __postClusterNodeStat(bag, next) {
-  if (bag.isSystemNode) return next();
+function __postClusterNodeStat(bag, done) {
+  if (bag.isSystemNode) return done();
 
   var who = bag.who + '|' + __postClusterNodeStat.name;
   logger.debug(who, 'Inside');
@@ -175,14 +175,14 @@ function __postClusterNodeStat(bag, next) {
   bag.adapter.postClusterNodeStats(clusterNodeStat,
     function (err) {
       if (err)
-        return next(err);
-      return next();
+        return done(err);
+      return done();
     }
   );
 }
 
-function __postSystemNodeStat(bag, next) {
-  if (!bag.isSystemNode) return next();
+function __postSystemNodeStat(bag, done) {
+  if (!bag.isSystemNode) return done();
 
   var who = bag.who + '|' + __postSystemNodeStat.name;
   logger.debug(who, 'Inside');
@@ -200,8 +200,8 @@ function __postSystemNodeStat(bag, next) {
   bag.adapter.postSystemNodeStats(systemNodeStat,
     function (err) {
       if (err)
-        return next(err);
-      return next();
+        return done(err);
+      return done();
     }
   );
 }
