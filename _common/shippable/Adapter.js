@@ -154,10 +154,28 @@ ShippableAdapter.prototype.postBuildJob =
     );
   };
 
+ShippableAdapter.prototype.postClusterNodeStats =
+  function (json, callback) {
+    this.post(
+      util.format('/clusterNodeStats'),
+      json,
+      callback
+    );
+  };
+
 ShippableAdapter.prototype.postFilesByResourceId =
   function (resourceId, json, callback) {
     this.post(
       util.format('/resources/%s/files', resourceId),
+      json,
+      callback
+    );
+  };
+
+ShippableAdapter.prototype.postSystemNodeStats =
+  function (json, callback) {
+    this.post(
+      util.format('/systemNodeStats'),
       json,
       callback
     );
