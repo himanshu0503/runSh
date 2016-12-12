@@ -102,6 +102,7 @@ function microWorker(message) {
       _publishJobNodeInfo.bind(null, bag),
       _getSystemCodes.bind(null, bag),
       _getJobStatus.bind(null, bag),
+      _validateCIJobMessage.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
@@ -273,6 +274,45 @@ function _getJobStatus(bag, next) {
       return next();
     }
   );
+}
+
+function _validateCIJobMessage(bag, next) {
+  if (!bag.isCIJob) return next();
+
+  var who = bag.who + '|' + _validateCIJobMessage.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openCmd('Validating incoming message');
+  var consoleErrors = [];
+
+  if (_.isEmpty(bag.ciSteps))
+    consoleErrors.push('No steps found');
+  else {
+    _.each(bag.ciSteps,
+      function(step) {
+        if (!step.execOrder)
+          consoleErrors.push(
+            util.format('scriptType:%s is missing execOrder', step.scriptType));
+      }
+    );
+  }
+
+  if (consoleErrors.length > 0) {
+    _.each(consoleErrors,
+      function (e) {
+        bag.consoleAdapter.publishMsg(e);
+      }
+    );
+    bag.consoleAdapter.closeCmd(false);
+    bag.consoleAdapter.closeGrp(false);
+
+    bag.ciJobStatusCode =
+      __getStatusCodeByNameForCI(bag, 'FAILED');
+  } else {
+    bag.consoleAdapter.publishMsg('Successfully validated incoming message');
+    bag.consoleAdapter.closeCmd(true);
+  }
+  return next();
 }
 
 function _checkInputParams(bag, next) {
