@@ -125,6 +125,7 @@ function microWorker(message) {
       _saveStepState.bind(null, bag),
       _getOutputVersion.bind(null, bag),
       _destroyPIDFile.bind(null, bag),
+      _updateJobStatus.bind(null, bag),
       _updateBuildJobStatus.bind(null, bag),
       _sendCompleteMessage.bind(null, bag),
       _updateResourceVersion.bind(null, bag),
@@ -1441,6 +1442,44 @@ function _destroyPIDFile(bag, next) {
 
       bag.consoleAdapter.publishMsg(msg);
       bag.consoleAdapter.closeCmd(true);
+      return next();
+    }
+  );
+}
+
+function _updateJobStatus(bag, next) {
+  if (!bag.isCIJob) return next();
+  if (bag.isCIJobCancelled) return next();
+  if (!bag.jobId) return next();
+
+  bag.consoleAdapter.openCmd('Updating job status');
+
+  var who = bag.who + '|' + _updateJobStatus.name;
+  logger.verbose(who, 'Inside');
+
+  var update = {};
+
+  //ciJobStatusCode is only set to failed, so if we reach this
+  // function without any code we know job has succeeded
+  if (!bag.ciJobStatusCode)
+    bag.ciJobStatusCode =
+      __getStatusCodeByNameForCI(bag, 'SUCCESS');
+
+  update.statusCode = bag.ciJobStatusCode;
+
+  bag.builderApiAdapter.putJobById(bag.jobId, update,
+    function(err) {
+      if (err) {
+        var msg = util.format('%s, failed to :putJobById for ' +
+          'jobId: %s with err: %s', who, bag.jobId, err);
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(false);
+        bag.consoleAdapter.closeGrp(false);
+      } else {
+        bag.consoleAdapter.publishMsg('Successfully updated job status');
+        bag.consoleAdapter.closeCmd(true);
+        bag.consoleAdapter.closeGrp(true);
+      }
       return next();
     }
   );

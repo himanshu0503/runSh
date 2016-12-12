@@ -254,6 +254,15 @@ ShippableAdapter.prototype.putClusterNodeById =
     );
   };
 
+ShippableAdapter.prototype.putJobById =
+  function (jobId, json, callback) {
+    this.put(
+      util.format('/jobs/%s', jobId),
+      json,
+      callback
+    );
+  };
+
 ShippableAdapter.prototype.validateClusterNodeById =
   function (clusterNodeId, callback) {
     this.get(
