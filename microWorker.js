@@ -5,7 +5,8 @@ module.exports = self;
 var fs = require('fs-extra');
 var path = require('path');
 var Adapter = require('./_common/shippable/Adapter.js');
-var ConsoleAdapter = require('./_common/buildJobConsoleAdapter.js');
+var BuildJobConsoleAdapter = require('./_common/buildJobConsoleAdapter.js');
+var JobConsoleAdapter = require('./_common/jobConsoleAdapter.js');
 var saveState = require('./_common/saveState.js');
 var executeScript = require('./_common/executeScript.js');
 var getPreviousState = require('./_common/getPreviousState.js');
@@ -72,10 +73,7 @@ function microWorker(message) {
   bag.subPrivateKeyPath = '/tmp/00_sub';
   bag.runShName = 'runSh';
 
-  if (message.runId)
-    bag.isCIJob = true;
-
-  if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes['system'])
+  if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
 
   // Push all the directories to be created in this array
@@ -83,10 +81,15 @@ function microWorker(message) {
     bag.outRootDir, bag.previousStateDir,
     bag.stateDir, bag.buildManagedDir);
 
-  bag.buildJobId = bag.inPayload.buildJobId;
-
-  bag.consoleAdapter =
-    new ConsoleAdapter(bag.builderApiToken, bag.buildJobId);
+  if (bag.inPayload.jobId) {
+    bag.isCIJob = true;
+    bag.consoleAdapter = new JobConsoleAdapter(bag.builderApiToken,
+      bag.inPayload.jobId);
+  } else {
+    bag.buildJobId = bag.inPayload.buildJobId;
+    bag.consoleAdapter =
+      new BuildJobConsoleAdapter(bag.builderApiToken, bag.buildJobId);
+  }
 
   bag.who = util.format('runSh|%s', self.name);
   logger.info(bag.who, 'Inside');
