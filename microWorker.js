@@ -59,7 +59,9 @@ function microWorker(message) {
     containerAction: 'continue',
     isSystemNode: false,
     dirsToBeCreated: [],
-    isCIJob: false
+    isCIJob: false,
+    jobId: message.jobId,
+    ciSteps: message.steps
   };
   // Setting Paths for get/put root directories
   bag.stepExecScriptPath = bag.buildRootDir + '/stepExec.sh';
@@ -81,10 +83,10 @@ function microWorker(message) {
     bag.outRootDir, bag.previousStateDir,
     bag.stateDir, bag.buildManagedDir);
 
-  if (bag.inPayload.jobId) {
+  if (bag.jobId) {
     bag.isCIJob = true;
     bag.consoleAdapter = new JobConsoleAdapter(bag.builderApiToken,
-      bag.inPayload.jobId);
+      bag.jobId);
   } else {
     bag.buildJobId = bag.inPayload.buildJobId;
     bag.consoleAdapter =
@@ -99,6 +101,7 @@ function microWorker(message) {
       _getSystemNode.bind(null, bag),
       _publishJobNodeInfo.bind(null, bag),
       _getSystemCodes.bind(null, bag),
+      _getJobStatus.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
@@ -247,6 +250,31 @@ function _getSystemCodes(bag, next) {
   );
 }
 
+function _getJobStatus(bag, next) {
+  if (!bag.isCIJob) return next();
+
+  var who = bag.who + '|' + _getJobStatus.name;
+  logger.verbose(who, 'Inside');
+
+  bag.builderApiAdapter.getJobById(bag.jobId,
+    function (err, job) {
+      if (err) {
+        var msg = util.format('%s, Failed to get job' +
+          ' for jobId:%s, with err: %s', who, bag.jobId, err);
+        logger.warn(msg);
+        bag.ciJobStatusCode = __getStatusCodeByNameForCI(bag, 'FAILED');
+      }
+      bag.isCIJobCancelled = false;
+      if (job.statusCode === __getStatusCodeByNameForCI(bag, 'CANCELED')) {
+        bag.isCIJobCancelled = true;
+        logger.warn(util.format('%s, CIJob with JobId:%s' +
+          ' is cancelled', who, bag.jobId));
+      }
+      return next();
+    }
+  );
+}
+
 function _checkInputParams(bag, next) {
   if (bag.isCIJob) return next();
 
@@ -322,7 +350,8 @@ function _checkInputParams(bag, next) {
     bag.consoleAdapter.closeCmd(false);
     bag.consoleAdapter.closeGrp(false);
 
-    bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'failure');
+    bag.pipelineJobStatusCode =
+      __getStatusCodeByNameForPipelines(bag, 'failure');
   } else {
     bag.consoleAdapter.publishMsg('Successfully validated incoming message');
     bag.consoleAdapter.closeCmd(true);
@@ -343,10 +372,12 @@ function _getBuildJobStatus(bag, next) {
         var msg = util.format('%s, Failed to get buildJob' +
           ' for buildJobId:%s, with err: %s', who, bag.buildJobId, err);
         logger.warn(msg);
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       }
       bag.isPipelineJobCancelled = false;
-      if (buildJob.statusCode === __getStatusCodeByName(bag, 'cancelled')) {
+      if (buildJob.statusCode ===
+        __getStatusCodeByNameForPipelines(bag, 'cancelled')) {
         bag.isPipelineJobCancelled = true;
         logger.warn(util.format('%s, Job with buildJobId:%s' +
           ' is cancelled', who, bag.buildJobId));
@@ -439,7 +470,8 @@ function _validateDependencies(bag, next) {
     );
     bag.consoleAdapter.closeCmd(false);
 
-    bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'failure');
+    bag.pipelineJobStatusCode =
+      __getStatusCodeByNameForPipelines(bag, 'failure');
   } else {
     bag.consoleAdapter.publishMsg('Successfully validated ' +
       bag.inPayload.dependencies.length + ' dependencies');
@@ -473,7 +505,8 @@ function _updateNodeIdInBuildJob(bag, next) {
         bag.consoleAdapter.closeCmd(false);
         bag.consoleAdapter.closeGrp(false);
 
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       } else {
         bag.consoleAdapter.closeCmd(true);
       }
@@ -525,7 +558,8 @@ function _removeBuildDirectory(bag, next) {
         bag.consoleAdapter.closeCmd(false);
         bag.consoleAdapter.closeGrp(false);
 
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       } else {
         bag.consoleAdapter.publishMsg('Successfully cleaned: ' + path);
         bag.consoleAdapter.closeCmd(true);
@@ -566,7 +600,8 @@ function _createDirectories(bag, next) {
         bag.consoleAdapter.closeCmd(false);
         bag.consoleAdapter.closeGrp(false);
 
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       }
       else
         bag.consoleAdapter.closeCmd(true);
@@ -616,7 +651,8 @@ function _getSecrets(bag, next) {
         var msg = util.format('%s, Failed to get accountIntegrations' +
           ' for buildJobId:%s, with err: %s', who, bag.buildJobId, err);
         logger.warn(msg);
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'failure');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'failure');
       }
       bag.secrets = buildJob.secrets;
 
@@ -642,7 +678,8 @@ function _saveSubPrivateKey(bag, next) {
         var msg = util.format('%s, Failed to save subscription private key, %s',
           who, err);
         logger.warn(msg);
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       } else {
         fs.chmodSync(bag.subPrivateKeyPath, '600');
       }
@@ -707,7 +744,8 @@ function _saveMessage(bag, next) {
         bag.consoleAdapter.closeCmd(false);
         bag.consoleAdapter.closeGrp(false);
 
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       } else {
         bag.consoleAdapter.publishMsg(
           'Successfully saved incoming job message at: ' + bag.messageFilePath);
@@ -774,7 +812,8 @@ function _saveStepMessage(bag, next) {
         bag.consoleAdapter.closeCmd(false);
         bag.consoleAdapter.closeGrp(false);
 
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       } else {
         bag.consoleAdapter.closeCmd(true);
       }
@@ -835,7 +874,8 @@ function _handleSteps(bag, next) {
     bag.consoleAdapter.closeCmd(false);
     bag.consoleAdapter.closeGrp(false);
 
-    bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'failure');
+    bag.pipelineJobStatusCode =
+      __getStatusCodeByNameForPipelines(bag, 'failure');
   }
 
   async.eachSeries(bag.inPayload.propertyBag.yml.steps,
@@ -895,7 +935,8 @@ function _handleSteps(bag, next) {
     },
     function (err) {
       if (err || bag.managedTaskFailed)
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'failure');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'failure');
       return next();
     }
   );
@@ -1199,10 +1240,12 @@ function _getLatestBuildJobStatus(bag, next) {
         var msg = util.format('%s, Failed to get buildJob' +
           ' for buildJobId:%s, with err: %s', who, bag.buildJobId, err);
         logger.warn(msg);
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       }
 
-      if (buildJob.statusCode === __getStatusCodeByName(bag, 'cancelled')) {
+      if (buildJob.statusCode ===
+        __getStatusCodeByNameForPipelines(bag, 'cancelled')) {
         bag.isPipelineJobCancelled = true;
         logger.warn(util.format('%s, Job with buildJobId:%s' +
           ' is cancelled', who, bag.buildJobId));
@@ -1260,7 +1303,8 @@ function _saveStepState(bag, next) {
 
         bag.consoleAdapter.closeGrp(false);
 
-        bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'error');
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'error');
       } else {
         bag.versionSha = sha;
         if (bag.pipelineJobStatusCode)
@@ -1337,10 +1381,11 @@ function _updateBuildJobStatus(bag, next) {
 
   var update = {};
 
-  //pipelineJobStatusCode is only set to failure/error, so if we reach this function
-  // without any code we know job has succeeded
+  //pipelineJobStatusCode is only set to failure/error, so if we reach this
+  // function without any code we know job has succeeded
   if (!bag.pipelineJobStatusCode)
-    bag.pipelineJobStatusCode = __getStatusCodeByName(bag, 'success');
+    bag.pipelineJobStatusCode =
+      __getStatusCodeByNameForPipelines(bag, 'success');
 
   update.statusCode = bag.pipelineJobStatusCode;
 
@@ -1373,7 +1418,8 @@ function _sendCompleteMessage(bag, next) {
 
   var event;
 
-  if (bag.pipelineJobStatusCode === __getStatusCodeByName(bag, 'success'))
+  if (bag.pipelineJobStatusCode ===
+    __getStatusCodeByNameForPipelines(bag, 'success'))
     event = 'on_success';
   else
     event = 'on_failure';
@@ -1421,7 +1467,8 @@ function _updateResourceVersion(bag, next) {
     propertyBag: {}
   };
 
-  if (bag.pipelineJobStatusCode === __getStatusCodeByName(bag, 'success') &&
+  if (bag.pipelineJobStatusCode ===
+    __getStatusCodeByNameForPipelines(bag, 'success') &&
     bag.isGrpSuccess)
     resource.versionTrigger = true;
   else
@@ -1613,6 +1660,11 @@ function __restartContainer(bag) {
   );
 }
 
-function __getStatusCodeByName(bag, codeName) {
+function __getStatusCodeByNameForPipelines(bag, codeName) {
   return _.findWhere(bag.systemCodes, { group: 'status', name: codeName}).code;
+}
+
+function __getStatusCodeByNameForCI(bag, codeName) {
+  return _.findWhere(bag.systemCodes,
+    { group: 'statusCodes', name: codeName}).code;
 }

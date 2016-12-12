@@ -10,7 +10,7 @@ function Adapter(apiToken, jobId) {
   this.who = 'runSh|_common|jobConsoleAdapter|jobId:' + jobId;
   this.jobId = jobId;
   this.startTimeInMicroSec = new Date().getTime() * 1000;
-  var processStartTime = process.hrTime();
+  var processStartTime = process.hrtime();
   this.processStartTimeInMicroSec =
     processStartTime[0] * 1e6 + processStartTime[1] / 1e3;
   this.ShippableAdapter = new ShippableAdapter(apiToken);
@@ -166,11 +166,11 @@ Adapter.prototype._postToJobConsole = function (forced) {
 
     var body = {
       jobId: that.jobId,
-      jobConsoles: consoles
+      jobConsoleModels: consoles
     };
 
     that.pendingApiCalls ++;
-    that.ShippableAdapter.postjobConsoles(body,
+    that.ShippableAdapter.postJobConsoles(that.jobId, body,
       function (err) {
         that.pendingApiCalls --;
         if (err)
@@ -195,7 +195,7 @@ Adapter.prototype.getPendingApiCallCount = function() {
 
 Adapter.prototype._getTimestamp = function () {
   var that = this;
-  var currentProcessTime = process.hrTime();
+  var currentProcessTime = process.hrtime();
   
   return that.startTimeInMicroSec +
     (currentProcessTime[0] * 1e6 + currentProcessTime[1]/1e3) -

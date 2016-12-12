@@ -180,6 +180,15 @@ ShippableAdapter.prototype.postFilesByResourceId =
     );
   };
 
+ShippableAdapter.prototype.postJobConsoles =
+  function (jobId, json, callback) {
+    this.post(
+      util.format('/jobs/%s/postConsoles', jobId),
+      json,
+      callback
+    );
+  };
+
 ShippableAdapter.prototype.postSystemNodeStats =
   function (json, callback) {
     this.post(
