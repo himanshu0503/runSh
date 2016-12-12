@@ -103,6 +103,7 @@ function microWorker(message) {
       _getSystemCodes.bind(null, bag),
       _getJobStatus.bind(null, bag),
       _validateCIJobMessage.bind(null, bag),
+      _validateCIJobStepsOrder.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
@@ -278,6 +279,7 @@ function _getJobStatus(bag, next) {
 
 function _validateCIJobMessage(bag, next) {
   if (!bag.isCIJob) return next();
+  if (bag.isCIJobCancelled) return next();
 
   var who = bag.who + '|' + _validateCIJobMessage.name;
   logger.verbose(who, 'Inside');
@@ -311,6 +313,41 @@ function _validateCIJobMessage(bag, next) {
   } else {
     bag.consoleAdapter.publishMsg('Successfully validated incoming message');
     bag.consoleAdapter.closeCmd(true);
+  }
+  return next();
+}
+
+function _validateCIJobStepsOrder(bag, next) {
+  if (!bag.isCIJob) return next();
+  if (bag.ciJobStatusCode) return next();
+  if (bag.isCIJobCancelled) return next();
+
+  var who = bag.who + '|' + _validateCIJobStepsOrder.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openCmd('Validating steps order');
+
+  bag.ciStepsInSortedOrder = _.sortBy(bag.ciSteps, 'execOrder');
+
+  var bootIndex = _.findIndex(bag.ciStepsInSortedOrder,
+    {who: 'mexec', scriptType: 'boot'});
+
+  var errMsg;
+  if (!bag.ciStepsInSortedOrder[bootIndex + 1])
+    errMsg = 'Missing cexec step after boot step';
+  else if (bag.ciStepsInSortedOrder[bootIndex + 1].who !== 'cexec')
+    errMsg = 'Incorrect ordering of cexec step';
+
+  if (errMsg) {
+    bag.consoleAdapter.publishMsg(errMsg);
+    bag.consoleAdapter.closeCmd(false);
+    bag.consoleAdapter.closeGrp(false);
+    bag.ciJobStatusCode =
+      __getStatusCodeByNameForCI(bag, 'FAILED');
+  } else {
+    bag.consoleAdapter.publishMsg('Successfully validated steps order');
+    bag.consoleAdapter.closeCmd(true);
+    bag.consoleAdapter.closeGrp(true);
   }
   return next();
 }
