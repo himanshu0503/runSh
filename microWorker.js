@@ -57,7 +57,8 @@ function microWorker(message) {
     builderApiAdapter: new Adapter(message.builderApiToken),
     containerAction: 'continue',
     isSystemNode: false,
-    dirsToBeCreated: []
+    dirsToBeCreated: [],
+    isCIJob: false
   };
   // Setting Paths for get/put root directories
   bag.stepExecScriptPath = bag.buildRootDir + '/stepExec.sh';
@@ -70,6 +71,9 @@ function microWorker(message) {
   bag.stepMessageFilename = 'version.json';
   bag.subPrivateKeyPath = '/tmp/00_sub';
   bag.runShName = 'runSh';
+
+  if (message.runId)
+    bag.isCIJob = true;
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes['system'])
     bag.isSystemNode = true;
@@ -130,6 +134,7 @@ function microWorker(message) {
 }
 
 function _getClusterNode(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isSystemNode) return next();
   var who = bag.who + '|' + _getClusterNode.name;
   logger.verbose(who, 'Inside');
@@ -157,6 +162,7 @@ function _getClusterNode(bag, next) {
 }
 
 function _getSystemNode(bag, next) {
+  if (bag.isCIJob) return next();
   if (!bag.isSystemNode) return next();
   var who = bag.who + '|' + _getSystemNode.name;
   logger.verbose(who, 'Inside');
@@ -184,6 +190,7 @@ function _getSystemNode(bag, next) {
 }
 
 function _publishJobNodeInfo(bag, next) {
+  if (bag.isCIJob) return next();
   var who = bag.who + '|' + _publishJobNodeInfo.name;
   logger.verbose(who, 'Inside');
 
@@ -207,6 +214,8 @@ function _publishJobNodeInfo(bag, next) {
     }
   );
 }
+
+//This needs to be cached in the global config
 
 function _getSystemCodes(bag, next) {
   var who = bag.who + '|' + _getSystemCodes.name;
@@ -236,6 +245,8 @@ function _getSystemCodes(bag, next) {
 }
 
 function _checkInputParams(bag, next) {
+  if (bag.isCIJob) return next();
+
   var who = bag.who + '|' + _checkInputParams.name;
   logger.verbose(who, 'Inside');
 
@@ -318,6 +329,8 @@ function _checkInputParams(bag, next) {
 
 
 function _getBuildJobStatus(bag, next) {
+  if (bag.isCIJob) return next();
+
   var who = bag.who + '|' + _getBuildJobStatus.name;
   logger.verbose(who, 'Inside');
 
@@ -341,6 +354,7 @@ function _getBuildJobStatus(bag, next) {
 }
 
 function _validateDependencies(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -433,6 +447,7 @@ function _validateDependencies(bag, next) {
 }
 
 function _updateNodeIdInBuildJob(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -465,6 +480,7 @@ function _updateNodeIdInBuildJob(bag, next) {
 }
 
 function _getBuildJobPropertyBag(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -487,6 +503,7 @@ function _getBuildJobPropertyBag(bag, next) {
 }
 
 function _removeBuildDirectory(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
 
   var who = bag.who + '|' + _removeBuildDirectory.name;
@@ -516,6 +533,7 @@ function _removeBuildDirectory(bag, next) {
 }
 
 function _createDirectories(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
 
   var who = bag.who + '|' + _createDirectories.name;
@@ -556,6 +574,7 @@ function _createDirectories(bag, next) {
 }
 
 function _getPreviousState(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
 
   var who = bag.who + '|' + _getPreviousState.name;
@@ -579,6 +598,7 @@ function _getPreviousState(bag, next) {
 }
 
 function _getSecrets(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -604,6 +624,7 @@ function _getSecrets(bag, next) {
 }
 
 function _saveSubPrivateKey(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
   if (bag.inPayload.type !== bag.runShName) return next();
@@ -628,6 +649,7 @@ function _saveSubPrivateKey(bag, next) {
 }
 
 function _extractSecrets(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -650,6 +672,7 @@ function _extractSecrets(bag, next) {
 }
 
 function _saveMessage(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -694,6 +717,7 @@ function _saveMessage(bag, next) {
 }
 
 function _saveStepMessage(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -758,6 +782,7 @@ function _saveStepMessage(bag, next) {
 }
 
 function _sendStartMessage(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -793,6 +818,7 @@ function _sendStartMessage(bag, next) {
 }
 
 function _handleSteps(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -873,6 +899,7 @@ function _handleSteps(bag, next) {
 }
 
 function _createComposition(bag, next) {
+  if (bag.isCIJob) return next();
   if (!_.isArray(bag.inPayload.dependencies)) return next();
 
   var who = bag.who + '|' + _createComposition.name;
@@ -1158,6 +1185,8 @@ function __executeManagedTask(bag, dependency, next) {
 }
 
 function _getLatestBuildJobStatus(bag, next) {
+  if (bag.isCIJob) return next();
+
   var who = bag.who + '|' + _getLatestBuildJobStatus.name;
   logger.verbose(who, 'Inside');
 
@@ -1181,6 +1210,7 @@ function _getLatestBuildJobStatus(bag, next) {
 }
 
 function _persistPreviousStateOnFailure(bag, next) {
+  if (bag.isCIJob) return next();
   if (!bag.jobStatusCode) return next();
 
   var who = bag.who + '|' + _persistPreviousStateOnFailure.name;
@@ -1210,6 +1240,7 @@ function _persistPreviousStateOnFailure(bag, next) {
 }
 
 function _saveStepState(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   var who = bag.who + '|' + _saveStepState.name;
   logger.verbose(who, 'Inside');
@@ -1238,6 +1269,7 @@ function _saveStepState(bag, next) {
 }
 
 function _getOutputVersion(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (bag.jobStatusCode) return next();
 
@@ -1291,6 +1323,7 @@ function _destroyPIDFile(bag, next) {
 }
 
 function _updateBuildJobStatus(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (!bag.buildJobId) return next();
 
@@ -1326,6 +1359,7 @@ function _updateBuildJobStatus(bag, next) {
 }
 
 function _sendCompleteMessage(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (!bag.buildJobId) return next();
 
@@ -1369,6 +1403,7 @@ function _sendCompleteMessage(bag, next) {
 }
 
 function _updateResourceVersion(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (!bag.resourceId) return next();
 
@@ -1416,6 +1451,7 @@ function _updateResourceVersion(bag, next) {
 }
 
 function _updateBuildJobVersion(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (!bag.buildJobId) return next();
   if (!bag.version || !bag.version.id) return next();
@@ -1449,6 +1485,7 @@ function _updateBuildJobVersion(bag, next) {
 }
 
 function _updateBuildStatusAndVersion(bag, next) {
+  if (bag.isCIJob) return next();
   if (bag.isCancelled) return next();
   if (!bag.buildId || !bag.buildJobId) return next();
 
