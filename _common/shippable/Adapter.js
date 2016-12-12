@@ -84,6 +84,14 @@ ShippableAdapter.prototype.getFilesByResourceId =
     );
   };
 
+ShippableAdapter.prototype.getJobById =
+  function (id, callback) {
+    this.get(
+      util.format('/jobs/%s', id),
+      callback
+    );
+  };
+
 ShippableAdapter.prototype.getSubscriptions =
   function (query, callback) {
     this.get(
