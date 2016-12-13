@@ -74,6 +74,8 @@ function microWorker(message) {
   bag.stepMessageFilename = 'version.json';
   bag.subPrivateKeyPath = '/tmp/00_sub';
   bag.runShName = 'runSh';
+  bag.mexecScriptDir = '/tmp/mexec';
+  bag.mexecScriptRunner = 'scriptRunner.sh';
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
@@ -105,6 +107,7 @@ function microWorker(message) {
       _validateCIJobMessage.bind(null, bag),
       _validateCIJobStepsOrder.bind(null, bag),
       _updateNodeIdInCIJob.bind(null, bag),
+      _createMexecDir.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
@@ -373,6 +376,38 @@ function _updateNodeIdInCIJob(bag, next) {
         var msg =
           util.format('%s, failed to :putJobById for jobId: %s, %s',
             who, bag.jobId, err);
+
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(false);
+        bag.consoleAdapter.closeGrp(false);
+
+        bag.ciJobStatusCode =
+          __getStatusCodeByNameForCI(bag, 'FAILED');
+      } else {
+        bag.consoleAdapter.publishMsg('Successfully updated node in job');
+        bag.consoleAdapter.closeCmd(true);
+      }
+      return next();
+    }
+  );
+}
+
+function _createMexecDir(bag, next) {
+  if (!bag.isCIJob) return next();
+  if (bag.ciJobStatusCode) return next();
+  if (bag.isCIJobCancelled) return next();
+
+  var who = bag.who + '|' + _createMexecDir.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openCmd('Creating mexec directory');
+
+  fs.mkdirp(bag.mexecScriptDir,
+    function (err) {
+      if (err) {
+        var msg =
+          util.format('%s, failed to create dir:%s with err:%s',
+            who, bag.mexecScriptDir, err);
 
         bag.consoleAdapter.publishMsg(msg);
         bag.consoleAdapter.closeCmd(false);
