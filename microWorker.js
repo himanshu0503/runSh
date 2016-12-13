@@ -61,7 +61,8 @@ function microWorker(message) {
     dirsToBeCreated: [],
     isCIJob: false,
     jobId: message.jobId,
-    ciSteps: message.steps
+    ciSteps: message.steps,
+    rawMessage: message
   };
   // Setting Paths for get/put root directories
   bag.stepExecScriptPath = bag.buildRootDir + '/stepExec.sh';
@@ -77,6 +78,8 @@ function microWorker(message) {
   bag.mexecScriptDir = '/tmp/mexec';
   bag.mexecScriptRunner = 'scriptRunner.sh';
   bag.sshDir = '/tmp/ssh';
+  bag.cexecDir = '/tmp/cexec';
+  bag.cexecMessageName = 'message.json';
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
@@ -110,6 +113,7 @@ function microWorker(message) {
       _updateNodeIdInCIJob.bind(null, bag),
       _createMexecDir.bind(null, bag),
       _cleanSSHDir.bind(null, bag),
+      _saveCIJobMessageForCexec.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
@@ -452,7 +456,40 @@ function _cleanSSHDir(bag, next) {
       } else {
         bag.consoleAdapter.publishMsg('Successfully clean ssh dir');
         bag.consoleAdapter.closeCmd(true);
+      }
+      return next();
+    }
+  );
+}
+
+function _saveCIJobMessageForCexec(bag, next) {
+  if (!bag.isCIJob) return next();
+  if (bag.ciJobStatusCode) return next();
+  if (bag.isCIJobCancelled) return next();
+
+  var who = bag.who + '|' + _saveCIJobMessageForCexec.name;
+  logger.verbose(who, 'Inside');
+
+  var cexecMessageNameWithLocation = path.join(bag.cexecDir,
+    bag.cexecMessageName);
+
+  fs.writeFile(cexecMessageNameWithLocation, JSON.stringify(bag.rawMessage),
+    function (err) {
+      if (err) {
+        var msg =
+          util.format('%s, failed to save cexec message with err:%s',
+            who, err);
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(false);
+        bag.consoleAdapter.closeGrp(false);
+
+        bag.ciJobStatusCode =
+          __getStatusCodeByNameForCI(bag, 'FAILED');
+      } else {
+        bag.consoleAdapter.publishMsg('Successfully clean ssh dir');
+        bag.consoleAdapter.closeCmd(true);
         bag.consoleAdapter.closeGrp(true);
+        fs.chmodSync(cexecMessageNameWithLocation, '755');
       }
       return next();
     }
