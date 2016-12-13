@@ -76,6 +76,7 @@ function microWorker(message) {
   bag.runShName = 'runSh';
   bag.mexecScriptDir = '/tmp/mexec';
   bag.mexecScriptRunner = 'scriptRunner.sh';
+  bag.sshDir = '/tmp/ssh';
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
@@ -108,6 +109,7 @@ function microWorker(message) {
       _validateCIJobStepsOrder.bind(null, bag),
       _updateNodeIdInCIJob.bind(null, bag),
       _createMexecDir.bind(null, bag),
+      _cleanSSHDir.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
@@ -416,7 +418,39 @@ function _createMexecDir(bag, next) {
         bag.ciJobStatusCode =
           __getStatusCodeByNameForCI(bag, 'FAILED');
       } else {
-        bag.consoleAdapter.publishMsg('Successfully updated node in job');
+        bag.consoleAdapter.publishMsg('Successfully created mexec directory');
+        bag.consoleAdapter.closeCmd(true);
+      }
+      return next();
+    }
+  );
+}
+
+function _cleanSSHDir(bag, next) {
+  if (!bag.isCIJob) return next();
+  if (bag.ciJobStatusCode) return next();
+  if (bag.isCIJobCancelled) return next();
+
+  var who = bag.who + '|' + _cleanSSHDir.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openCmd('Cleaning ssh directory');
+
+  fs.emptyDir(bag.sshDir,
+    function (err) {
+      if (err) {
+        var msg =
+          util.format('%s, failed to clean dir:%s with err:%s',
+            who, bag.sshDir, err);
+
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(false);
+        bag.consoleAdapter.closeGrp(false);
+
+        bag.ciJobStatusCode =
+          __getStatusCodeByNameForCI(bag, 'FAILED');
+      } else {
+        bag.consoleAdapter.publishMsg('Successfully clean ssh dir');
         bag.consoleAdapter.closeCmd(true);
         bag.consoleAdapter.closeGrp(true);
       }
