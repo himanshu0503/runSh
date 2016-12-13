@@ -9,6 +9,7 @@ var BuildJobConsoleAdapter = require('./_common/buildJobConsoleAdapter.js');
 var JobConsoleAdapter = require('./_common/jobConsoleAdapter.js');
 var saveState = require('./_common/saveState.js');
 var executeScript = require('./_common/executeScript.js');
+var executeJobScript = require('./_common/executeJobScript.js');
 var getPreviousState = require('./_common/getPreviousState.js');
 var exec = require('child_process').exec;
 
@@ -114,6 +115,7 @@ function microWorker(message) {
       _createMexecDir.bind(null, bag),
       _cleanSSHDir.bind(null, bag),
       _saveCIJobMessageForCexec.bind(null, bag),
+      _executeCIJob.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
       _validateDependencies.bind(null, bag),
@@ -491,6 +493,31 @@ function _saveCIJobMessageForCexec(bag, next) {
         bag.consoleAdapter.closeGrp(true);
         fs.chmodSync(cexecMessageNameWithLocation, '755');
       }
+      return next();
+    }
+  );
+}
+
+function _executeCIJob(bag, next) {
+  if (!bag.isCIJob) return next();
+  if (bag.ciJobStatusCode) return next();
+  if (bag.isCIJobCancelled) return next();
+
+  var who = bag.who + '|' + _executeCIJob.name;
+  logger.verbose(who, 'Inside');
+
+  var scriptBag = {
+    consoleAdapter: bag.consoleAdapter,
+    steps: bag.ciStepsInSortedOrder,
+    mexecFileNameWithPath: path.join(bag.mexecScriptDir,
+      bag.mexecScriptRunner)
+  };
+
+  executeJobScript(scriptBag,
+    function (err) {
+      if (err)
+        bag.ciJobStatusCode = __getStatusCodeByNameForCI(bag, 'FAILED');
+
       return next();
     }
   );
