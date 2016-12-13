@@ -24,10 +24,10 @@ function Adapter(apiToken, jobId) {
 Adapter.prototype.openGrp = function (consoleGrpName, isShown) {
   var that = this;
   var who = that.who + '|_openGrp';
+  var showGrp = true;
 
-  // By default we will display the group
-  if (!_.isBoolean(isShown))
-    isShown = true;
+  if ((_.isBoolean(isShown) && !isShown) || isShown === 'false')
+    showGrp = false;
 
   that.consoleGrpName = consoleGrpName;
   that.consoleGrpId = uuid.v4();
@@ -43,15 +43,19 @@ Adapter.prototype.openGrp = function (consoleGrpName, isShown) {
     type: 'grp',
     message: that.consoleGrpName,
     timestamp: that._getTimestamp(),
-    isShown: isShown
+    isShown: showGrp
   };
 
   that.buffer.push(consoleGrp);
   that._postToJobConsole(true);
 };
 
-Adapter.prototype.closeGrp = function (isSuccess) {
+Adapter.prototype.closeGrp = function (isSuccess, isShown) {
   var that = this;
+  var showGrp = true;
+
+  if ((_.isBoolean(isShown) && !isShown) || isShown === 'false')
+    showGrp = false;
 
   //The grp is already closed
   if (!that.consoleGrpName)
@@ -70,7 +74,7 @@ Adapter.prototype.closeGrp = function (isSuccess) {
     timestamp: that._getTimestamp(),
     timestampEndedAt: that._getTimestamp(),
     isSuccess: isSuccess,
-    isShown: true
+    isShown: showGrp
   };
 
   that.buffer.push(consoleGrp);
@@ -139,7 +143,7 @@ Adapter.prototype.publishMsg = function (message) {
     consoleId: uuid.v4(),
     parentConsoleId: that.consoleCmdId,
     type: 'msg',
-    message: message,
+    message: message + '\n',
     timestamp: that._getTimestamp(),
     isShown: true
   };
