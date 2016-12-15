@@ -81,6 +81,8 @@ function microWorker(message) {
   bag.sshDir = '/tmp/ssh';
   bag.cexecDir = '/tmp/cexec';
   bag.cexecMessageName = 'message.json';
+  bag.artifactsDir = '/shippableci';
+  bag.onStartEnvDir = 'onstartjobenvs';
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
@@ -113,8 +115,8 @@ function microWorker(message) {
       _validateCIJobStepsOrder.bind(null, bag),
       _updateNodeIdInCIJob.bind(null, bag),
       _createMexecDir.bind(null, bag),
+      _cleanOnStartEnvDir.bind(null, bag),
       _cleanSSHDir.bind(null, bag),
-      _saveCIJobMessageForCexec.bind(null, bag),
       _executeCIJob.bind(null, bag),
       _checkInputParams.bind(null, bag),
       _getBuildJobStatus.bind(null, bag),
@@ -280,6 +282,7 @@ function _getJobStatus(bag, next) {
         bag.ciJobStatusCode = __getStatusCodeByNameForCI(bag, 'FAILED');
       }
       bag.isCIJobCancelled = false;
+      bag.ciJob = job;
       if (job.statusCode === __getStatusCodeByNameForCI(bag, 'CANCELED')) {
         bag.isCIJobCancelled = true;
         logger.warn(util.format('%s, CIJob with JobId:%s' +
@@ -432,6 +435,41 @@ function _createMexecDir(bag, next) {
   );
 }
 
+function _cleanOnStartEnvDir(bag, next) {
+  if (!bag.isCIJob) return next();
+  if (bag.ciJobStatusCode) return next();
+  if (bag.isCIJobCancelled) return next();
+
+  var jobEnvDir =  path.join(bag.artifactsDir, bag.onStartEnvDir);
+
+  var who = bag.who + '|' + _cleanOnStartEnvDir.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openCmd('Cleaning onStartEnvDir directory');
+
+  fs.emptyDir(jobEnvDir,
+    function (err) {
+      if (err) {
+        var msg =
+          util.format('%s, failed to clean dir:%s with err:%s',
+            who, jobEnvDir, err);
+
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(false);
+        bag.consoleAdapter.closeGrp(false);
+
+        bag.ciJobStatusCode =
+          __getStatusCodeByNameForCI(bag, 'FAILED');
+      } else {
+        bag.consoleAdapter.publishMsg('Successfully cleaned ' +
+          'onStartEnvDir directory');
+        bag.consoleAdapter.closeCmd(true);
+      }
+      return next();
+    }
+  );
+}
+
 function _cleanSSHDir(bag, next) {
   if (!bag.isCIJob) return next();
   if (bag.ciJobStatusCode) return next();
@@ -456,42 +494,8 @@ function _cleanSSHDir(bag, next) {
         bag.ciJobStatusCode =
           __getStatusCodeByNameForCI(bag, 'FAILED');
       } else {
-        bag.consoleAdapter.publishMsg('Successfully clean ssh dir');
+        bag.consoleAdapter.publishMsg('Successfully cleaned ssh directory');
         bag.consoleAdapter.closeCmd(true);
-      }
-      return next();
-    }
-  );
-}
-
-function _saveCIJobMessageForCexec(bag, next) {
-  if (!bag.isCIJob) return next();
-  if (bag.ciJobStatusCode) return next();
-  if (bag.isCIJobCancelled) return next();
-
-  var who = bag.who + '|' + _saveCIJobMessageForCexec.name;
-  logger.verbose(who, 'Inside');
-
-  var cexecMessageNameWithLocation = path.join(bag.cexecDir,
-    bag.cexecMessageName);
-
-  fs.writeFile(cexecMessageNameWithLocation, JSON.stringify(bag.rawMessage),
-    function (err) {
-      if (err) {
-        var msg =
-          util.format('%s, failed to save cexec message with err:%s',
-            who, err);
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(false);
-        bag.consoleAdapter.closeGrp(false);
-
-        bag.ciJobStatusCode =
-          __getStatusCodeByNameForCI(bag, 'FAILED');
-      } else {
-        bag.consoleAdapter.publishMsg('Successfully clean ssh dir');
-        bag.consoleAdapter.closeCmd(true);
-        bag.consoleAdapter.closeGrp(true);
-        fs.chmodSync(cexecMessageNameWithLocation, '755');
       }
       return next();
     }
@@ -510,7 +514,13 @@ function _executeCIJob(bag, next) {
     consoleAdapter: bag.consoleAdapter,
     steps: bag.ciStepsInSortedOrder,
     mexecFileNameWithPath: path.join(bag.mexecScriptDir,
-      bag.mexecScriptRunner)
+      bag.mexecScriptRunner),
+    ciJob: bag.ciJob,
+    jobEnvDir: path.join(bag.artifactsDir, bag.onStartEnvDir),
+    builderApiAdapter: bag.builderApiAdapter,
+    rawMessage: bag.rawMessage,
+    cexecMessageNameWithLocation: path.join(bag.cexecDir,
+      bag.cexecMessageName)
   };
 
   executeJobScript(scriptBag,
