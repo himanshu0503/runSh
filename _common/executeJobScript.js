@@ -48,13 +48,12 @@ function _executeSteps(bag, next) {
   var who = bag.who + '|' + _executeSteps.name;
   logger.debug(who, 'Inside');
 
-  bag.currentStepIndex = -1;
-  async.eachSeries(bag.steps,
-    function(step, nextStep) {
+  async.eachOfSeries(bag.steps,
+    function(step, index, nextStep) {
       bag.currentStep = step;
-      bag.currentStepIndex ++;
+      bag.currentStepIndex = index;
       async.series([
-          __cexecStepToFile.bind(null, bag),
+          __writeCexecStepsToFile.bind(null, bag),
           __writeStepToFile.bind(null, bag),
           __executeTask.bind(null, bag),
           __readOnStartEnvs.bind(null, bag),
@@ -71,16 +70,16 @@ function _executeSteps(bag, next) {
   );
 }
 
-function __cexecStepToFile(bag, done) {
+function __writeCexecStepsToFile(bag, done) {
   if (!bag.continueNextStep) return done();
-  if (bag.currentStep.who !== 'mexec') return  done();
+  if (bag.currentStep.who !== 'mexec') return done();
   if (bag.currentStepIndex + 1 === bag.steps.length) return done();
   if (bag.steps[bag.currentStepIndex + 1].who !== 'cexec') return done();
 
-  var who = bag.who + '|' + __cexecStepToFile.name;
+  var who = bag.who + '|' + __writeCexecStepsToFile.name;
   logger.debug(who, 'Inside');
 
-  var messageClone = JSON.parse(JSON.stringify(bag.rawMessage));
+  var messageClone = _.clone(bag.rawMessage);
 
   messageClone.steps =
     messageClone.steps.splice(bag.currentStepIndex + 1, bag.steps.length);
@@ -97,7 +96,7 @@ function __cexecStepToFile(bag, done) {
 
 function __writeStepToFile(bag, done) {
   if (!bag.continueNextStep) return done();
-  if (bag.currentStep.who !== 'mexec') return  done();
+  if (bag.currentStep.who !== 'mexec') return done();
 
   var who = bag.who + '|' + __writeStepToFile.name;
   logger.debug(who, 'Inside');
@@ -115,7 +114,7 @@ function __writeStepToFile(bag, done) {
 
 function __executeTask(bag, done) {
   if (!bag.continueNextStep) return done();
-  if (bag.currentStep.who !== 'mexec') return  done();
+  if (bag.currentStep.who !== 'mexec') return done();
 
   var who = bag.who + '|' + __executeTask.name;
   logger.debug(who, 'Inside');
@@ -143,7 +142,7 @@ function __executeTask(bag, done) {
 
 function __readOnStartEnvs(bag, done) {
   if (!bag.continueNextStep) return done();
-  if (bag.currentStep.who !== 'mexec') return  done();
+  if (bag.currentStep.who !== 'mexec') return done();
   if (!bag.readOnStartJobEnvs) return done();
 
   var who = bag.who + '|' + __readOnStartEnvs.name;
@@ -187,7 +186,7 @@ function __readOnStartEnvs(bag, done) {
 
 function __putOnStartEnvsInJob(bag, done) {
   if (!bag.continueNextStep) return done();
-  if (bag.currentStep.who !== 'mexec') return  done();
+  if (bag.currentStep.who !== 'mexec') return done();
   if (!bag.putOnStartJobEnvs) return done();
 
   var who = bag.who + '|' + __putOnStartEnvsInJob.name;
