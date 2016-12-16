@@ -4,14 +4,23 @@ module.exports = self;
 
 var spawn = require('child_process').spawn;
 var fs = require('fs-extra');
+var path = require('path');
 
 function executeJobScript(externalBag, callback) {
   var bag = {
     consoleAdapter: externalBag.consoleAdapter,
+    builderApiAdapter: externalBag.builderApiAdapter,
     steps: externalBag.steps,
     mexecFileNameWithPath: externalBag.mexecFileNameWithPath,
     isFailedJob: false,
-    continueNextStep: true
+    continueNextStep: true,
+    ciJob: externalBag.ciJob,
+    jobEnvDir: externalBag.jobEnvDir,
+    readOnStartJobEnvs: false,
+    putOnStartJobEnvs: false,
+    onStartJobEnvs: [],
+    rawMessage: externalBag.rawMessage,
+    cexecMessageNameWithLocation: externalBag.cexecMessageNameWithLocation
   };
 
   bag.who = 'runSh|_common|' + self.name;
@@ -39,12 +48,16 @@ function _executeSteps(bag, next) {
   var who = bag.who + '|' + _executeSteps.name;
   logger.debug(who, 'Inside');
 
-  async.eachSeries(bag.steps,
-    function(step, nextStep) {
+  async.eachOfSeries(bag.steps,
+    function(step, index, nextStep) {
       bag.currentStep = step;
+      bag.currentStepIndex = index;
       async.series([
+          __writeCexecStepsToFile.bind(null, bag),
           __writeStepToFile.bind(null, bag),
-          __executeTask.bind(null, bag)
+          __executeTask.bind(null, bag),
+          __readOnStartEnvs.bind(null, bag),
+          __putOnStartEnvsInJob.bind(null, bag)
         ],
         function(err) {
           return nextStep(err);
@@ -57,13 +70,39 @@ function _executeSteps(bag, next) {
   );
 }
 
+function __writeCexecStepsToFile(bag, done) {
+  if (!bag.continueNextStep) return done();
+  if (bag.currentStep.who !== 'mexec') return done();
+  if (bag.currentStepIndex + 1 === bag.steps.length) return done();
+  if (bag.steps[bag.currentStepIndex + 1].who !== 'cexec') return done();
+
+  var who = bag.who + '|' + __writeCexecStepsToFile.name;
+  logger.debug(who, 'Inside');
+
+  var messageClone = _.clone(bag.rawMessage);
+
+  messageClone.steps =
+    messageClone.steps.splice(bag.currentStepIndex + 1, bag.steps.length);
+
+  fs.writeFile(bag.cexecMessageNameWithLocation, JSON.stringify(messageClone),
+    function (err) {
+      if (err)
+        return done(err);
+      fs.chmodSync(bag.cexecMessageNameWithLocation, '755');
+      return done();
+    }
+  );
+}
+
 function __writeStepToFile(bag, done) {
   if (!bag.continueNextStep) return done();
+  if (bag.currentStep.who !== 'mexec') return done();
 
   var who = bag.who + '|' + __writeStepToFile.name;
   logger.debug(who, 'Inside');
 
-  fs.writeFile(bag.mexecFileNameWithPath, bag.currentStep.script,
+  fs.writeFile(bag.mexecFileNameWithPath,
+    bag.currentStep.script,
     function (err) {
       if (err)
         return done(err);
@@ -75,6 +114,7 @@ function __writeStepToFile(bag, done) {
 
 function __executeTask(bag, done) {
   if (!bag.continueNextStep) return done();
+  if (bag.currentStep.who !== 'mexec') return done();
 
   var who = bag.who + '|' + __executeTask.name;
   logger.debug(who, 'Inside');
@@ -95,6 +135,73 @@ function __executeTask(bag, done) {
 
   exec.on('close',
     function()  {
+      return done();
+    }
+  );
+}
+
+function __readOnStartEnvs(bag, done) {
+  if (!bag.continueNextStep) return done();
+  if (bag.currentStep.who !== 'mexec') return done();
+  if (!bag.readOnStartJobEnvs) return done();
+
+  var who = bag.who + '|' + __readOnStartEnvs.name;
+  logger.debug(who, 'Inside');
+
+  if (!fs.existsSync(bag.jobEnvDir)) {
+    bag.readOnStartJobEnvs = false;
+    return done();
+  }
+
+  var fileNames = fs.readdirSync(bag.jobEnvDir);
+  if (_.isEmpty(fileNames)) {
+    bag.readOnStartJobEnvs = false;
+    return done();
+  }
+
+  var validJSONFiles = [];
+
+  _.each(fileNames,
+    function(fileName) {
+      if (path.extname(fileName) === '.json')
+        validJSONFiles.push(path.join(bag.jobEnvDir, fileName));
+    }
+  );
+
+  if (_.isEmpty(validJSONFiles)) {
+    bag.readOnStartJobEnvs = false;
+    return done();
+  }
+
+  _.each(validJSONFiles,
+    function(fileName) {
+      var json = fs.readFileSync(fileName, 'utf8');
+      bag.onStartJobEnvs.push(json);
+    }
+  );
+  bag.readOnStartJobEnvs = false;
+  bag.putOnStartJobEnvs = true;
+  return done();
+}
+
+function __putOnStartEnvsInJob(bag, done) {
+  if (!bag.continueNextStep) return done();
+  if (bag.currentStep.who !== 'mexec') return done();
+  if (!bag.putOnStartJobEnvs) return done();
+
+  var who = bag.who + '|' + __putOnStartEnvsInJob.name;
+  logger.debug(who, 'Inside');
+
+  bag.ciJob.onStartJobEnvs = bag.onStartJobEnvs;
+
+  bag.builderApiAdapter.putJobById(bag.ciJob.id, bag.ciJob,
+    function(err, job) {
+      if (err)
+        logger.warn(util.inspect('%s, Failed to save onStartJobEnvs ' +
+          'for job:%s with error:%s', who, bag.ciJob.id, err)
+        );
+      bag.ciJob = job;
+      bag.putOnStartJobEnvs = false;
       return done();
     }
   );
@@ -124,6 +231,8 @@ function __parseLogLine(bag, line) {
     bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH__SHOULD_NOT_CONTINUE__') {
     bag.continueNextStep = false;
+  } else if (lineSplit[0] === '__SH_ON_START_JOB_ENV_SCRIPT_COMPLETE__') {
+    bag.readOnStartJobEnvs = true;
   } else {
     bag.consoleAdapter.publishMsg(line);
   }
