@@ -16,16 +16,15 @@ function ci(externalBag, callback) {
     rawMessage: externalBag.rawMessage,
     consoleAdapter: externalBag.consoleAdapter,
     builderApiAdapter: externalBag.builderApiAdapter,
-    isCIJobCancelled: false
+    isCIJobCancelled: false,
+    mexecScriptDir: '/tmp/mexec',
+    mexecScriptRunner: 'scriptRunner.sh',
+    sshDir: '/tmp/ssh',
+    cexecDir: '/tmp/cexec',
+    cexecMessageName: 'message.json',
+    artifactsDir: '/shippableci',
+    onStartEnvDir: 'onstartjobenvs',
   };
-
-  bag.mexecScriptDir = '/tmp/mexec';
-  bag.mexecScriptRunner = 'scriptRunner.sh';
-  bag.sshDir = '/tmp/ssh';
-  bag.cexecDir = '/tmp/cexec';
-  bag.cexecMessageName = 'message.json';
-  bag.artifactsDir = '/shippableci';
-  bag.onStartEnvDir = 'onstartjobenvs';
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;

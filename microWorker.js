@@ -49,9 +49,9 @@ function _checkInputParams(bag, next) {
       bag.rawMessage.jobId);
   } else if (bag.rawMessage.payload && bag.rawMessage.payload.buildJobId) {
     bag.workflow = 'pipelines';
-  bag.consoleAdapter = new BuildJobConsoleAdapter(
-    bag.rawMessage.builderApiToken,
-    bag.rawMessage.payload.buildJobId);
+    bag.consoleAdapter = new BuildJobConsoleAdapter(
+      bag.rawMessage.builderApiToken,
+      bag.rawMessage.payload.buildJobId);
   } else {
     logger.warn(util.inspect('%s, No jobId/buildJobId present' +
       ' in incoming message', who));
@@ -70,20 +70,18 @@ function _applyWorkflowStrategy(bag, next) {
   var workflowStrategy = workflowStrategies[bag.workflow];
 
   if (!workflowStrategy) {
-    logger.warn(util.format('Strategy not found workflow: %s',
-        bag.workflow)
-    );
+    logger.warn(util.format('Strategy not found workflow: %s', bag.workflow));
     return next(true);
   }
   workflowStrategy(bag,
-    function(err) {
+    function (err) {
       if (err) {
         logger.warn(who,
           util.format('Failed to apply strategy for workflow:%s',
            bag.workflow)
         );
 
-        return next(true);
+        return next(err);
       }
       return next();
     }
@@ -102,8 +100,12 @@ function __restartExecContainer(bag) {
   };
 
   async.retry(retryOpts,
-    function(callback) {
-      var callsPending = bag.consoleAdapter.getPendingApiCallCount();
+    function (callback) {
+      var callsPending = 0;
+
+      if (bag.consoleAdapter)
+        callsPending = bag.consoleAdapter.getPendingApiCallCount();
+
       if (callsPending < 1) {
         __restartContainer(bag);
         return callback();
