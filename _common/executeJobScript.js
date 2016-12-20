@@ -213,6 +213,7 @@ function __parseLogLine(bag, line) {
   var cmdJSON = null;
   var grpJSON = null;
   var isSuccess = null;
+  var messagesNotToBePosted = ['__SH__SHOULD_CONTINUE__', '__SH__SCRIPT_END_SUCCESS__'];
 
   if (lineSplit[0] === '__SH__GROUP__START__') {
     grpJSON = JSON.parse(lineSplit[1]);
@@ -233,7 +234,7 @@ function __parseLogLine(bag, line) {
     bag.continueNextStep = false;
   } else if (lineSplit[0] === '__SH_ON_START_JOB_ENV_SCRIPT_COMPLETE__') {
     bag.readOnStartJobEnvs = true;
-  } else {
+  } else if (!_.contains(messagesNotToBePosted, lineSplit[0])) {
     bag.consoleAdapter.publishMsg(line);
   }
 }
