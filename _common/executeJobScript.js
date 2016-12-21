@@ -213,7 +213,8 @@ function __parseLogLine(bag, line) {
   var cmdJSON = null;
   var grpJSON = null;
   var isSuccess = null;
-  var messagesNotToBePosted = ['__SH__SHOULD_CONTINUE__', '__SH__SCRIPT_END_SUCCESS__'];
+  var messagesNotToBePosted = ['__SH__SHOULD_CONTINUE__',
+    '__SH__SCRIPT_END_SUCCESS__'];
 
   if (lineSplit[0] === '__SH__GROUP__START__') {
     grpJSON = JSON.parse(lineSplit[1]);
@@ -222,16 +223,19 @@ function __parseLogLine(bag, line) {
     grpJSON = JSON.parse(lineSplit[1]);
     isSuccess = grpJSON.exitcode === '0';
     bag.consoleAdapter.closeGrp(isSuccess, grpJSON.is_shown);
+    if (!isSuccess) bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH__CMD__START__') {
     bag.consoleAdapter.openCmd(lineSplit[2]);
   } else if (lineSplit[0] === '__SH__CMD__END__') {
     cmdJSON = JSON.parse(lineSplit[1]);
     isSuccess = cmdJSON.exitcode === '0';
     bag.consoleAdapter.closeCmd(isSuccess);
+    if (!isSuccess) bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH__SCRIPT_END_FAILURE__') {
     bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH__SHOULD_NOT_CONTINUE__') {
     bag.continueNextStep = false;
+    bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH_ON_START_JOB_ENV_SCRIPT_COMPLETE__') {
     bag.readOnStartJobEnvs = true;
   } else if (!_.contains(messagesNotToBePosted, lineSplit[0])) {
