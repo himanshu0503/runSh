@@ -98,11 +98,12 @@ function _getJobStatus(bag, next) {
       } else {
         bag.ciJob = job;
 
-        if (job.statusCode === __getStatusCodeByNameForCI(bag, 'CANCELED')) {
-          bag.isCIJobCancelled = true;
-          bag.consoleAdapter.publishMsg('Job:' + bag.jobId +
-            ' is canceled, skipping');
-          bag.consoleAdapter.closeCmd(true);
+        if (job.statusCode === __getStatusCodeByNameForCI(bag, 'CANCELED') ||
+          job.statusCode === __getStatusCodeByNameForCI(bag, 'TIMEOUT')) {
+            bag.isCIJobCancelled = true;
+            bag.consoleAdapter.publishMsg('Job:' + bag.jobId +
+              ' is canceled/timedout, skipping');
+            bag.consoleAdapter.closeCmd(true);
         } else {
           bag.consoleAdapter.publishMsg('Successfully fetched job');
           bag.consoleAdapter.closeCmd(true);
