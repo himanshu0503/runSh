@@ -32,6 +32,8 @@ function executeJobScript(externalBag, callback) {
     ],
     function () {
       logger.verbose(bag.who, 'Completed');
+      //Force pushing all the debug messages
+      bag.consoleAdapter.publishDebugMessages();
       return callback(bag.isFailedJob);
     }
   );
@@ -71,6 +73,8 @@ function _executeSteps(bag, next) {
 }
 
 function __writeCexecStepsToFile(bag, done) {
+  bag.consoleAdapter.setCurrentScriptType(bag.currentStep.scriptType);
+
   if (!bag.continueNextStep) return done();
   if (bag.currentStep.who !== 'mexec') return done();
   if (bag.currentStepIndex + 1 === bag.steps.length) return done();
@@ -86,8 +90,11 @@ function __writeCexecStepsToFile(bag, done) {
 
   fs.writeFile(bag.cexecMessageNameWithLocation, JSON.stringify(messageClone),
     function (err) {
-      if (err)
+      if (err) {
+        var msg = util.format('%s, Failed with err:%s', who, err);
+        bag.consoleAdapter.publishMsg(msg);
         return done(err);
+      }
       fs.chmodSync(bag.cexecMessageNameWithLocation, '755');
       return done();
     }
@@ -104,8 +111,11 @@ function __writeStepToFile(bag, done) {
   fs.writeFile(bag.mexecFileNameWithPath,
     bag.currentStep.script,
     function (err) {
-      if (err)
+      if (err) {
+        var msg = util.format('%s, Failed with err:%s', who, err);
+        bag.consoleAdapter.publishMsg(msg);
         return done(err);
+      }
       fs.chmodSync(bag.mexecFileNameWithPath, '755');
       return done();
     }
@@ -134,7 +144,11 @@ function __executeTask(bag, done) {
   );
 
   exec.on('close',
-    function()  {
+    function(exitCode)  {
+      if (exitCode) {
+        bag.isFailedJob = true;
+        bag.continueNextStep = false;
+       }
       return done();
     }
   );
@@ -196,10 +210,11 @@ function __putOnStartEnvsInJob(bag, done) {
 
   bag.builderApiAdapter.putJobById(bag.ciJob.id, bag.ciJob,
     function(err, job) {
-      if (err)
-        logger.warn(util.inspect('%s, Failed to save onStartJobEnvs ' +
-          'for job:%s with error:%s', who, bag.ciJob.id, err)
-        );
+      if (err) {
+        var msg = util.format('%s, Failed to save onStartJobEnvs ' +
+          'for job:%s with error:%s', who, bag.ciJob.id, err);
+        bag.consoleAdapter.publishMsg(msg);
+      }
       bag.ciJob = job;
       bag.putOnStartJobEnvs = false;
       return done();
