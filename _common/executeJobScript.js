@@ -238,14 +238,12 @@ function __parseLogLine(bag, line) {
     grpJSON = JSON.parse(lineSplit[1]);
     isSuccess = grpJSON.exitcode === '0';
     bag.consoleAdapter.closeGrp(isSuccess, grpJSON.is_shown);
-    if (!isSuccess) bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH__CMD__START__') {
     bag.consoleAdapter.openCmd(lineSplit[2]);
   } else if (lineSplit[0] === '__SH__CMD__END__') {
     cmdJSON = JSON.parse(lineSplit[1]);
     isSuccess = cmdJSON.exitcode === '0';
     bag.consoleAdapter.closeCmd(isSuccess);
-    if (!isSuccess) bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH__SCRIPT_END_FAILURE__') {
     bag.isFailedJob = true;
   } else if (lineSplit[0] === '__SH__SHOULD_NOT_CONTINUE__') {
