@@ -19,6 +19,8 @@ function Adapter(apiToken, jobId) {
   this.bufferTimeInterval = 3000;
   this.bufferTimer = null;
   this.pendingApiCalls = 0;
+  this.messageWithNoParentConsole = [];
+  this.scriptType = null;
 }
 
 Adapter.prototype.openGrp = function (consoleGrpName, isShown) {
@@ -87,6 +89,11 @@ Adapter.prototype.openCmd = function (consoleCmdName) {
   var that = this;
   var who = that.who + '|_openCmd';
 
+  if (!that.consoleGrpId) {
+    that.pushMessageToDebug(consoleCmdName);
+    return;
+  }
+
   if (_.isEmpty(consoleCmdName))
     throw new ActErr(who, ActErr.ParamNotFound,
       'Missing param :consoleCmdName');
@@ -137,6 +144,11 @@ Adapter.prototype.closeCmd = function (isSuccess) {
 
 Adapter.prototype.publishMsg = function (message) {
   var that = this;
+
+  if (!that.consoleCmdId) {
+    that.pushMessageToDebug(message);
+    return;
+  }
 
   var consoleGrp = {
     jobId: that.jobId,
@@ -204,4 +216,31 @@ Adapter.prototype._getTimestamp = function () {
   return that.startTimeInMicroSec +
     (currentProcessTime[0] * 1e6 + currentProcessTime[1]/1e3) -
       that.processStartTimeInMicroSec;
+};
+
+Adapter.prototype.setCurrentScriptType = function(scriptType) {
+  var that = this;
+  that.scriptType = scriptType;
+};
+
+Adapter.prototype.pushMessageToDebug = function(msg) {
+  var that = this;
+  var debugMsg = 'ScriptType:' + that.scriptType + '|msg:' + msg;
+  that.messageWithNoParentConsole.push(debugMsg);
+};
+
+Adapter.prototype.publishDebugMessages = function() {
+  var that = this;
+
+  if (_.isEmpty(that.messageWithNoParentConsole)) return;
+
+  that.openGrp('Debug');
+  that.openCmd('Debug logs');
+  _.each(that.messageWithNoParentConsole,
+    function (message) {
+      that.publishMsg(message);
+    }
+  );
+  that.closeCmd(true);
+  that.closeGrp(true);
 };
