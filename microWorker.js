@@ -125,7 +125,7 @@ function __restartContainer(bag) {
   var who = bag.who + '|' + __restartContainer.name;
   logger.verbose(who, 'Inside');
 
-  exec('sudo docker restart -t=0 shippable-exec-$NODE_ID',
+  exec('docker restart -t=0 shippable-exec-$NODE_ID',
     function(err) {
       if (err)
         logger.error(util.format('Failed to stop container with ' +
