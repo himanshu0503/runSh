@@ -865,6 +865,7 @@ function _handleSteps(bag, next) {
 
       async.series([
           __handleDependency.bind(null, bag, dependency),
+          __addDependencyEnvironmentVariables.bind(null, bag, dependency),
           __getDependencyIntegrations.bind(null, bag, dependency),
           __generateStepExecScript.bind(null, bag, dependency),
           __writeStepExecScript.bind(null, bag, dependency),
@@ -973,6 +974,89 @@ function __handleDependency(bag, dependency, next) {
   );
 }
 
+function __addDependencyEnvironmentVariables(bag, dependency, next) {
+  if (dependency.operation === bag.operation.TASK) return next();
+  if (dependency.operation === bag.operation.NOTIFY) return next();
+
+  var who = bag.who + '|' + __addDependencyEnvironmentVariables.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openCmd('Adding environment variables for ' +
+    dependency.name);
+
+  var sanitizedDependencyName =
+    dependency.name.replace(/[^A-Za-z0-9_]/g, '').toUpperCase();
+
+  bag.commonEnvs.push(
+    util.format('%s_PATH="%s"',
+      sanitizedDependencyName, bag.inRootDir + '/' + dependency.name)
+  );
+
+  bag.commonEnvs.push(
+    util.format('%s_NAME="%s"', sanitizedDependencyName, dependency.name)
+  );
+
+  bag.commonEnvs.push(
+    util.format('%s_TYPE="%s"', sanitizedDependencyName, dependency.type)
+  );
+
+  bag.commonEnvs.push(
+    util.format('%s_OPERATION="%s"',
+      sanitizedDependencyName, dependency.operation)
+  );
+
+  if (dependency.version) {
+    bag.commonEnvs.push(util.format('%s_VERSION_VERSIONNAME="%s"',
+      sanitizedDependencyName,
+      dependency.version.versionName
+    ));
+    bag.commonEnvs.push(util.format('%s_VERSION_VERSIONNUMBER="%s"',
+      sanitizedDependencyName,
+      dependency.version.versionNumber
+    ));
+  }
+
+  if (dependency.propertyBag.yml) {
+    if (dependency.propertyBag.yml.pointer)
+      _.each(_.keys(dependency.propertyBag.yml.pointer),
+        function (key) {
+          var value = dependency.propertyBag.yml.pointer[key];
+          if (_.isArray(value))
+            value = value.join(',');
+          else if (_.isObject(value))
+            value = JSON.stringify(value);
+
+          bag.commonEnvs.push(util.format('%s_POINTER_%s="%s"',
+            sanitizedDependencyName,
+            key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+            value
+          ));
+        }
+      );
+
+    if (dependency.propertyBag.yml.seed)
+      _.each(_.keys(dependency.propertyBag.yml.seed),
+        function (key) {
+          var value = dependency.propertyBag.yml.seed[key];
+          if (_.isArray(value))
+            value = value.join(',');
+          else if (_.isObject(value))
+            value = JSON.stringify(value);
+
+          bag.commonEnvs.push(util.format('%s_SEED_%s="%s"',
+            sanitizedDependencyName,
+            key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+            value
+          ));
+        }
+      );
+  }
+
+  bag.consoleAdapter.closeCmd(true);
+
+  return next();
+}
+
 function __getDependencyIntegrations(bag, dependency, next) {
   if (dependency.operation !== bag.operation.IN) return next();
   if (!dependency.subscriptionIntegrationId) return next();
@@ -1019,11 +1103,6 @@ function __getDependencyIntegrations(bag, dependency, next) {
       // add integrations to environment variables
       var sanitizedDependencyName =
         dependency.name.replace(/[^A-Za-z0-9_]/g, '').toUpperCase();
-
-      bag.commonEnvs.push(util.format('%s_PATH="%s"',
-        sanitizedDependencyName,
-        bag.inRootDir + '/' + dependency.name
-      ));
 
       _.each(_.keys(integrationValues),
         function (key) {
