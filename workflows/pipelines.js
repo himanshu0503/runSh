@@ -57,6 +57,7 @@ function pipelines(externalBag, callback) {
     consoleAdapter: externalBag.consoleAdapter,
     builderApiAdapter: externalBag.builderApiAdapter
   };
+
   // Setting Paths for get/put root directories
   bag.stepExecScriptPath = bag.buildRootDir + '/stepExec.sh';
   bag.inRootDir = bag.buildRootDir + '/IN';
@@ -78,7 +79,7 @@ function pipelines(externalBag, callback) {
     bag.stateDir, bag.buildManagedDir);
 
 
-  bag.who = util.format('runSh|worflow|%s', self.name);
+  bag.who = util.format('runSh|workflow|%s', self.name);
   logger.info(bag.who, 'Inside');
 
   async.series([
@@ -811,6 +812,20 @@ function _handleSteps(bag, next) {
       __getStatusCodeByNameForPipelines(bag, 'failure');
   }
 
+  bag.commonEnvs = [
+    util.format('RESOURCE_ID=%s', bag.resourceId),
+    util.format('BUILD_ID=%s', bag.buildId),
+    util.format('BUILD_NUMBER=%s', bag.buildNumber),
+    util.format('BUILD_JOB_ID=%s', bag.buildJobId),
+    util.format('BUILD_JOB_NUMBER=%s', 1),
+    util.format('JOB_NAME=%s', bag.inPayload.name),
+    util.format('JOB_TYPE=%s', bag.inPayload.type),
+    util.format('SUBSCRIPTION_ID=%s', bag.inPayload.subscriptionId),
+    util.format('%s_PATH="%s"',
+      bag.inPayload.name.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+      bag.buildRootDir)
+  ];
+
   async.eachSeries(bag.inPayload.propertyBag.yml.steps,
     function (step, nextStep) {
       logger.verbose('Executing step:', step);
@@ -971,7 +986,7 @@ function __getDependencyIntegrations(bag, dependency, next) {
     dependency.subscriptionIntegrationId,
     function (err, subInt) {
       if (err) {
-        var msg = util.format('%s, Failed getSubscriptionIntegrationById for' +
+        var msg = util.format('%s, Failed getSubscriptionIntegrationById for ' +
           'id: %s, with err: %s', who,
           dependency.subscriptionIntegrationId, err);
 
@@ -1000,6 +1015,25 @@ function __getDependencyIntegrations(bag, dependency, next) {
           envString = envString + '\n' + key + '="' +
             integrationValues[key] + '"';
       });
+
+      // add integrations to environment variables
+      var sanitizedDependencyName =
+        dependency.name.replace(/[^A-Za-z0-9_]/g, '').toUpperCase();
+
+      bag.commonEnvs.push(util.format('%s_PATH="%s"',
+        sanitizedDependencyName,
+        bag.inRootDir + '/' + dependency.name
+      ));
+
+      _.each(_.keys(integrationValues),
+        function (key) {
+          bag.commonEnvs.push(util.format('%s_INTEGRATION_%s="%s"',
+            sanitizedDependencyName,
+            key.toUpperCase(),
+            integrationValues[key]
+          ));
+        }
+      );
 
       var innerBagEnv = {
         who: who,
@@ -1071,22 +1105,11 @@ function __generateStepExecScript(bag, dependency, next) {
       }
     );
 
-  var env = [
-    util.format('RESOURCE_ID=%s', bag.resourceId),
-    util.format('BUILD_ID=%s', bag.buildId),
-    util.format('BUILD_NUMBER=%s', bag.buildNumber),
-    util.format('BUILD_JOB_ID=%s', bag.buildJobId),
-    util.format('BUILD_JOB_NUMBER=%s', 1),
-    util.format('JOB_NAME=%s', bag.inPayload.name),
-    util.format('JOB_TYPE=%s', bag.inPayload.type),
-    util.format('SUBSCRIPTION_ID=%s', bag.inPayload.subscriptionId)
-  ];
-
   var templateData = {
     scriptPath: strategyPath,
     on_success: on_success,
     on_failure: on_failure,
-    env: env
+    env: bag.commonEnvs
   };
 
   bag.consoleAdapter.publishMsg('Successfully generated managed task script');
