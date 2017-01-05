@@ -911,9 +911,14 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
   var sanitizedDependencyName =
     dependency.name.replace(/[^A-Za-z0-9_]/g, '').toUpperCase();
 
+  var path;
+  if (dependency.operation === bag.operation.IN)
+    path = bag.inRootDir + '/' + dependency.name;
+  else if (dependency.operation === bag.operation.OUT)
+    path = bag.outRootDir + '/' + dependency.name;
+
   bag.commonEnvs.push(
-    util.format('%s_PATH="%s"',
-      sanitizedDependencyName, bag.inRootDir + '/' + dependency.name)
+    util.format('%s_PATH="%s"', sanitizedDependencyName, path)
   );
 
   bag.commonEnvs.push(
