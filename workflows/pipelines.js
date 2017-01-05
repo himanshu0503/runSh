@@ -101,6 +101,7 @@ function pipelines(externalBag, callback) {
       _saveMessage.bind(null, bag),
       _saveStepMessage.bind(null, bag),
       _sendStartMessage.bind(null, bag),
+      _setUpDependencies.bind(null, bag),
       _handleSteps.bind(null, bag),
       _createComposition.bind(null, bag),
       _getLatestBuildJobStatus.bind(null, bag),
@@ -794,11 +795,11 @@ function _sendStartMessage(bag, next) {
   );
 }
 
-function _handleSteps(bag, next) {
+function _setUpDependencies(bag, next) {
   if (bag.isPipelineJobCancelled) return next();
   if (bag.pipelineJobStatusCode) return next();
 
-  var who = bag.who + '|' + _handleSteps.name;
+  var who = bag.who + '|' + _setUpDependencies.name;
   logger.verbose(who, 'Inside');
 
   if (!bag.inPayload.propertyBag.yml) {
@@ -810,6 +811,8 @@ function _handleSteps(bag, next) {
 
     bag.pipelineJobStatusCode =
       __getStatusCodeByNameForPipelines(bag, 'failure');
+
+    return next('No yml found for job steps');
   }
 
   bag.commonEnvs = [
@@ -826,29 +829,35 @@ function _handleSteps(bag, next) {
       bag.buildRootDir)
   ];
 
-  async.eachSeries(bag.inPayload.propertyBag.yml.steps,
+  var inAndOutSteps = _.filter(bag.inPayload.propertyBag.yml.steps,
+    function (step) {
+      return _.has(step, 'IN') || _.has(step, 'OUT');
+    }
+  );
+
+  bag.consoleAdapter.openGrp('Setting Up Dependencies');
+  // We don't know where the group will end so need a flag
+  var isGrpSuccess = true;
+
+  async.eachSeries(inAndOutSteps,
     function (step, nextStep) {
       logger.verbose('Executing step:', step);
 
       var operation = _.find(_.keys(step),
         function (key) {
           return _.contains(
-            [bag.operation.IN, bag.operation.OUT, bag.operation.TASK], key);
+            [bag.operation.IN, bag.operation.OUT], key);
         }
       );
       var name = step[operation];
+
+      bag.consoleAdapter.openCmd('Setting up dependency: ' + name);
 
       var dependency = _.find(bag.inPayload.dependencies,
         function (dependency) {
           return dependency.name === name && dependency.operation === operation;
         }
       );
-
-      if (!dependency && operation === bag.operation.TASK)
-        dependency = {
-          name: name,
-          operation: operation
-        };
 
       if (!dependency) {
         bag.consoleAdapter.openGrp('Step Error');
@@ -858,32 +867,33 @@ function _handleSteps(bag, next) {
           who, operation, name);
         bag.consoleAdapter.publishMsg(msg);
         bag.consoleAdapter.closeCmd(false);
-        bag.consoleAdapter.closeGrp(false);
 
         return nextStep(true);
       }
 
       async.series([
-          __handleDependency.bind(null, bag, dependency),
           __addDependencyEnvironmentVariables.bind(null, bag, dependency),
-          __getDependencyIntegrations.bind(null, bag, dependency),
-          __generateStepExecScript.bind(null, bag, dependency),
-          __writeStepExecScript.bind(null, bag, dependency),
-          __executeManagedTask.bind(null, bag, dependency)
+          __getDependencyIntegrations.bind(null, bag, dependency)
         ],
         function (err) {
-          if (bag.isGrpSuccess)
-            bag.consoleAdapter.closeGrp(true);
-          else {
+          if (err) {
             bag.consoleAdapter.closeCmd(false);
-            bag.consoleAdapter.closeGrp(false);
+            isGrpSuccess = false;
+          } else {
+            bag.consoleAdapter.closeCmd(true);
           }
+
           return nextStep(err);
         }
       );
     },
     function (err) {
-      if (err || bag.managedTaskFailed)
+      if (isGrpSuccess)
+        bag.consoleAdapter.closeGrp(true);
+      else
+        bag.consoleAdapter.closeGrp(false);
+
+      if (err)
         bag.pipelineJobStatusCode =
           __getStatusCodeByNameForPipelines(bag, 'failure');
       return next();
@@ -891,97 +901,11 @@ function _handleSteps(bag, next) {
   );
 }
 
-function _createComposition(bag, next) {
-  if (!_.isArray(bag.inPayload.dependencies)) return next();
-
-  var who = bag.who + '|' + _createComposition.name;
-  logger.verbose(who, 'Inside');
-
-  bag.composition = _.map(bag.inPayload.dependencies,
-    function (dependency) {
-      return {
-        versionId: dependency.version && dependency.version.versionId,
-        name: dependency.name
-      };
-    }
-  );
-
-  return next();
-}
-
-function __handleDependency(bag, dependency, next) {
-  // We don't know where the group will end so need a flag
-  bag.isGrpSuccess = true;
-
-  if (dependency.operation === bag.operation.TASK) return next();
-  if (dependency.operation === bag.operation.NOTIFY) return next();
-
-  var msg = util.format('Processing %s Dependency: %s', dependency.operation,
-    dependency.name);
-  bag.consoleAdapter.openGrp(msg);
-
-  var who = bag.who + '|' + __handleDependency.name;
-  logger.verbose(who, 'Inside');
-  bag.consoleAdapter.openCmd('Dependency Info');
-  bag.consoleAdapter.publishMsg('Version Number: ' +
-    dependency.version.versionNumber);
-
-  if (dependency.version.versionName !== null)
-    bag.consoleAdapter.publishMsg('Version Name: ' +
-      dependency.version.versionName);
-  bag.consoleAdapter.closeCmd(true);
-
-  bag.consoleAdapter.openCmd('Validating ' + dependency.name + ' handler');
-
-  var dependencyHandler;
-  var rootDir;
-  if (dependency.operation === bag.operation.IN) {
-    dependencyHandler = inMap[dependency.type];
-    rootDir = bag.inRootDir;
-  } else if (dependency.operation === bag.operation.OUT) {
-    dependencyHandler = outMap[dependency.type];
-    rootDir = bag.outRootDir;
-  }
-
-  if (!dependencyHandler) {
-    msg = util.format('No dependencyHandler for dependency type: %s %s',
-      dependency.operation, dependency.type);
-
-    bag.consoleAdapter.publishMsg(msg);
-    bag.isGrpSuccess = false;
-
-    return next(true);
-  }
-
-  if (!rootDir) {
-    msg = util.format('No root directory for dependency type: %s %s',
-      dependency.operation, dependency.type);
-    bag.consoleAdapter.publishMsg(msg);
-    bag.isGrpSuccess = false;
-    return next(true);
-  }
-
-  // Closing the command as dependencyHandler will call it's own cmd
-  bag.consoleAdapter.publishMsg('Successfully validated handler');
-  bag.consoleAdapter.closeCmd(true);
-
-  dependencyHandler(bag, dependency, rootDir,
-    function (err) {
-      if (err)
-        bag.isGrpSuccess = false;
-      return next(err);
-    }
-  );
-}
-
 function __addDependencyEnvironmentVariables(bag, dependency, next) {
-  if (dependency.operation === bag.operation.TASK) return next();
-  if (dependency.operation === bag.operation.NOTIFY) return next();
-
   var who = bag.who + '|' + __addDependencyEnvironmentVariables.name;
   logger.verbose(who, 'Inside');
 
-  bag.consoleAdapter.openCmd('Adding environment variables for ' +
+  bag.consoleAdapter.publishMsg('Adding environment variables for ' +
     dependency.name);
 
   var sanitizedDependencyName =
@@ -1052,8 +976,6 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
       );
   }
 
-  bag.consoleAdapter.closeCmd(true);
-
   return next();
 }
 
@@ -1064,7 +986,7 @@ function __getDependencyIntegrations(bag, dependency, next) {
   var who = bag.who + '|' + __getDependencyIntegrations.name;
   logger.verbose(who, 'Inside');
 
-  bag.consoleAdapter.openCmd('Getting dependency integrations');
+  bag.consoleAdapter.publishMsg('Getting integration');
 
   bag.builderApiAdapter.getSubscriptionIntegrationById(
     dependency.subscriptionIntegrationId,
@@ -1074,11 +996,11 @@ function __getDependencyIntegrations(bag, dependency, next) {
           'id: %s, with err: %s', who,
           dependency.subscriptionIntegrationId, err);
 
-        bag.isGrpSuccess = false;
         bag.consoleAdapter.publishMsg(msg);
 
         return next(err);
       }
+
       var accountIntegration = _.findWhere(bag.secrets.data.accountIntegrations,
        { id: subInt.accountIntegrationId });
 
@@ -1129,16 +1051,148 @@ function __getDependencyIntegrations(bag, dependency, next) {
         ],
         function (err) {
           if (err) {
-            bag.isGrpSuccess = false;
-
+            bag.consoleAdapter.publishMsg('Failed to create integration file');
             return next(true);
           }
-
-          bag.consoleAdapter.closeCmd(true);
 
           return next();
         }
       );
+    }
+  );
+}
+
+function _handleSteps(bag, next) {
+  if (bag.isPipelineJobCancelled) return next();
+  if (bag.pipelineJobStatusCode) return next();
+
+  var who = bag.who + '|' + _handleSteps.name;
+  logger.verbose(who, 'Inside');
+
+  async.eachSeries(bag.inPayload.propertyBag.yml.steps,
+    function (step, nextStep) {
+      logger.verbose('Executing step:', step);
+
+      var operation = _.find(_.keys(step),
+        function (key) {
+          return _.contains(
+            [bag.operation.IN, bag.operation.OUT, bag.operation.TASK], key);
+        }
+      );
+      var name = step[operation];
+
+      var dependency = _.find(bag.inPayload.dependencies,
+        function (dependency) {
+          return dependency.name === name && dependency.operation === operation;
+        }
+      );
+
+      if (!dependency && operation === bag.operation.TASK)
+        dependency = {
+          name: name,
+          operation: operation
+        };
+
+      if (!dependency) {
+        bag.consoleAdapter.openGrp('Step Error');
+        bag.consoleAdapter.openCmd('Errors');
+
+        var msg = util.format('%s, Missing dependency for: %s %s',
+          who, operation, name);
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(false);
+        bag.consoleAdapter.closeGrp(false);
+
+        return nextStep(true);
+      }
+
+      async.series([
+          __handleDependency.bind(null, bag, dependency),
+          __generateStepExecScript.bind(null, bag, dependency),
+          __writeStepExecScript.bind(null, bag, dependency),
+          __executeManagedTask.bind(null, bag, dependency)
+        ],
+        function (err) {
+          if (bag.isGrpSuccess)
+            bag.consoleAdapter.closeGrp(true);
+          else {
+            bag.consoleAdapter.closeCmd(false);
+            bag.consoleAdapter.closeGrp(false);
+          }
+          return nextStep(err);
+        }
+      );
+    },
+    function (err) {
+      if (err || bag.managedTaskFailed)
+        bag.pipelineJobStatusCode =
+          __getStatusCodeByNameForPipelines(bag, 'failure');
+      return next();
+    }
+  );
+}
+
+function __handleDependency(bag, dependency, next) {
+  // We don't know where the group will end so need a flag
+  bag.isGrpSuccess = true;
+
+  if (dependency.operation === bag.operation.TASK) return next();
+  if (dependency.operation === bag.operation.NOTIFY) return next();
+
+  var who = bag.who + '|' + __handleDependency.name;
+  logger.verbose(who, 'Inside');
+
+  var msg = util.format('Processing %s Dependency: %s', dependency.operation,
+    dependency.name);
+  bag.consoleAdapter.openGrp(msg);
+  bag.consoleAdapter.openCmd('Dependency Info');
+  bag.consoleAdapter.publishMsg('Version Number: ' +
+    dependency.version.versionNumber);
+
+  if (dependency.version.versionName !== null)
+    bag.consoleAdapter.publishMsg('Version Name: ' +
+      dependency.version.versionName);
+  bag.consoleAdapter.closeCmd(true);
+
+  bag.consoleAdapter.openCmd('Validating ' + dependency.name + ' handler');
+
+  var dependencyHandler;
+  var rootDir;
+  if (dependency.operation === bag.operation.IN) {
+    dependencyHandler = inMap[dependency.type];
+    rootDir = bag.inRootDir;
+  } else if (dependency.operation === bag.operation.OUT) {
+    dependencyHandler = outMap[dependency.type];
+    rootDir = bag.outRootDir;
+  }
+
+  if (!dependencyHandler) {
+    msg = util.format('No dependencyHandler for dependency type: %s %s',
+      dependency.operation, dependency.type);
+
+    bag.consoleAdapter.publishMsg(msg);
+    bag.isGrpSuccess = false;
+
+    return next(true);
+  }
+
+  if (!rootDir) {
+    msg = util.format('No root directory for dependency type: %s %s',
+      dependency.operation, dependency.type);
+    bag.consoleAdapter.publishMsg(msg);
+    bag.isGrpSuccess = false;
+    return next(true);
+  }
+
+  // Closing the command as dependencyHandler will call it's own cmd
+  bag.consoleAdapter.publishMsg('Successfully validated handler');
+  bag.consoleAdapter.closeCmd(true);
+
+  dependencyHandler(bag, dependency, rootDir,
+    function (err) {
+      if (err)
+        bag.isGrpSuccess = false;
+      return next(err);
     }
   );
 }
@@ -1262,6 +1316,24 @@ function __executeManagedTask(bag, dependency, next) {
   );
 }
 
+function _createComposition(bag, next) {
+  if (!_.isArray(bag.inPayload.dependencies)) return next();
+
+  var who = bag.who + '|' + _createComposition.name;
+  logger.verbose(who, 'Inside');
+
+  bag.composition = _.map(bag.inPayload.dependencies,
+    function (dependency) {
+      return {
+        versionId: dependency.version && dependency.version.versionId,
+        name: dependency.name
+      };
+    }
+  );
+
+  return next();
+}
+
 function _getLatestBuildJobStatus(bag, next) {
   var who = bag.who + '|' + _getLatestBuildJobStatus.name;
   logger.verbose(who, 'Inside');
@@ -1296,11 +1368,11 @@ function _persistPreviousStateOnFailure(bag, next) {
   bag.consoleAdapter.openGrp('Persisting Previous State');
   bag.consoleAdapter.openCmd('Copy previous state to current state');
 
-  var srcDir = bag.previousStateDir ;
+  var srcDir = bag.previousStateDir;
   var destDir = bag.stateDir;
   fs.copy(srcDir, destDir,
     function (err) {
-      if(err) {
+      if (err) {
         bag.consoleAdapter.publishMsg(
           'Failed to persist previous state of job');
         bag.consoleAdapter.closeCmd(false);
