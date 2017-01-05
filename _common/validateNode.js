@@ -39,7 +39,7 @@ function _checkInputParams(bag, next) {
   var consoleErrors = [];
   bag.adapter = new ShippableAdapter('');
 
-  if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes['system'])
+  if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
 
   if (consoleErrors.length > 0) {
@@ -106,6 +106,7 @@ function __validateClusterNode(innerBag) {
       async.series([
           __readPIDFile.bind(null, innerBag),
           __destroyPIDFile.bind(null, innerBag),
+          __removeCexecContainer.bind(null, innerBag),
           __restartExecContainer.bind(null, innerBag),
           __stopExecContainer.bind(null, innerBag)
         ],
@@ -151,6 +152,7 @@ function __validateSystemNode(innerBag) {
       async.series([
           __readPIDFile.bind(null, innerBag),
           __destroyPIDFile.bind(null, innerBag),
+          __removeCexecContainer.bind(null, innerBag),
           __restartExecContainer.bind(null, innerBag),
           __stopExecContainer.bind(null, innerBag)
         ],
@@ -205,11 +207,29 @@ function __destroyPIDFile(bag, next) {
   );
 }
 
+function __removeCexecContainer(bag, next) {
+  if (bag.skipAllSteps) return next();
+
+  var who = bag.who + '|' + __removeCexecContainer.name;
+  logger.debug(who, 'Inside');
+
+  exec('docker ps | grep \'c.exec.\' | awk \'{print $1}\' |' +
+    ' xargs -I {} docker rm -fv {}',
+    function(err) {
+      if (err)
+        logger.error(
+          util.format('Failed to stop cexec container with err:%s', err)
+        );
+      return next(err);
+    }
+  );
+}
+
 function __restartExecContainer(bag, next) {
   if (bag.skipAllSteps) return next();
   if (bag.action !== 'restart') return next();
 
-  var who = bag.who + __restartExecContainer.name;
+  var who = bag.who + '|' + __restartExecContainer.name;
   logger.debug(who, 'Inside');
 
   exec('sudo docker restart -t=0 shippable-exec-$NODE_ID',
@@ -227,7 +247,7 @@ function __stopExecContainer(bag, next) {
   if (bag.skipAllSteps) return next();
   if (bag.action !== 'shutdown') return next();
 
-  var who = bag.who + __stopExecContainer.name;
+  var who = bag.who + '|' + __stopExecContainer.name;
   logger.debug(who, 'Inside');
 
   exec('sudo docker stop -t=0 shippable-exec-$NODE_ID',
