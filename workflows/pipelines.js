@@ -951,9 +951,7 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
       _.each(_.keys(dependency.propertyBag.yml.pointer),
         function (key) {
           var value = dependency.propertyBag.yml.pointer[key];
-          if (_.isArray(value))
-            value = value.join(',');
-          else if (_.isObject(value))
+          if (_.isObject(value))
             value = JSON.stringify(value);
 
           bag.commonEnvs.push(util.format('%s_POINTER_%s="%s"',
@@ -968,9 +966,7 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
       _.each(_.keys(dependency.propertyBag.yml.seed),
         function (key) {
           var value = dependency.propertyBag.yml.seed[key];
-          if (_.isArray(value))
-            value = value.join(',');
-          else if (_.isObject(value))
+          if (_.isObject(value))
             value = JSON.stringify(value);
 
           bag.commonEnvs.push(util.format('%s_SEED_%s="%s"',
@@ -1034,10 +1030,14 @@ function __getDependencyIntegrations(bag, dependency, next) {
 
       _.each(_.keys(integrationValues),
         function (key) {
+          var value = integrationValues[key];
+          if (_.isObject(value))
+            value = JSON.stringify(value);
+
           bag.commonEnvs.push(util.format('%s_INTEGRATION_%s="%s"',
             sanitizedDependencyName,
-            key.toUpperCase(),
-            integrationValues[key]
+            key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+            value
           ));
         }
       );
