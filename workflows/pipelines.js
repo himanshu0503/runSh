@@ -935,9 +935,10 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
   );
 
   if (dependency.version) {
+    var versionName = dependency.version.versionName || '';
     bag.commonEnvs.push(util.format('%s_VERSION_VERSIONNAME="%s"',
       sanitizedDependencyName,
-      dependency.version.versionName
+      versionName
     ));
     bag.commonEnvs.push(util.format('%s_VERSION_VERSIONNUMBER="%s"',
       sanitizedDependencyName,
