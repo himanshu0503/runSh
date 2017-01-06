@@ -9,6 +9,8 @@ var Adapter = require('../_common/shippable/Adapter.js');
 function MicroService(params) {
   logger.info('Starting', msName);
   this.AMQPConnection = {};
+  this.queue = {};
+  this.ackWaitTimeMS = 2 * 1000;  // 2 seconds
   this.timeoutLength = 1;
   this.timeoutLimit = 180;
   this.checkHealth = params.checkHealth;
@@ -18,7 +20,7 @@ function MicroService(params) {
   this.publicAdapter = new Adapter('');
   this.isSystemNode = false;
 
-  if (parseInt(config.nodeTypeCode) === nodeTypeCodes['system'])
+  if (parseInt(config.nodeTypeCode) === nodeTypeCodes.system)
     this.isSystemNode = true;
 
   return this.init();
@@ -166,7 +168,13 @@ MicroService.prototype.connectToQueue = function (next) {
         prefetchCount: 1
       };
 
-      queue.subscribe(queueParams, this.disconnectAndProcess.bind(this));
+      this.queue = queue;
+      queue.subscribe(queueParams, this.disconnectAndProcess.bind(this))
+        .addCallback(
+          function (ok) {
+            this.consumerTag = ok.consumerTag;
+          }.bind(this)
+        );
 
       return next();
     }.bind(this)
@@ -175,17 +183,41 @@ MicroService.prototype.connectToQueue = function (next) {
 
 MicroService.prototype.disconnectAndProcess =
   function (message, headers, deliveryInfo, ack) {
+    logger.verbose(
+      util.format('Disconnecting from queue: %s and processing',
+      config.inputQueue)
+    );
+
+    if (!this.consumerTag) {
+      logger.warn('consumerTag not available yet, rejecting and listening.');
+      ack.reject(true);
+      return;
+    }
+
+    var bag = {
+      who: util.format('runSh|micro|%s', self.name),
+      ack: ack,
+      ackMessage: true,
+      ackWaitTimeMS: this.ackWaitTimeMS,
+      queue: this.queue,
+      nodeId: this.nodeId,
+      pidFile: this.pidFile,
+      consumerTag: this.consumerTag,
+      isSystemNode: this.isSystemNode,
+      publicAdapter: this.publicAdapter
+    };
+
     async.series([
-        this.validateClusterNode.bind(this),
-        this.validateSystemNode.bind(this),
-        this.checkPIDFile.bind(this),
-        this.createPIDFile.bind(this),
+        _validateClusterNode.bind(null, bag),
+        _validateSystemNode.bind(null, bag),
+        _checkPIDFile.bind(null, bag),
+        _createPIDFile.bind(null, bag),
+        _unsubscribeFromQueue.bind(null, bag),
+        _ackMessage.bind(null, bag),
+        _rejectMessage.bind(null, bag)
       ],
-      function (err) {
-        if (err)
-          ack.reject(true);
-        else {
-          ack.acknowledge();
+      function () {
+        if (bag.ackMessage) {
           this.AMQPConnection.closing = true;
           this.AMQPConnection.disconnect();
           this.microWorker(message, headers, deliveryInfo, ack);
@@ -194,82 +226,130 @@ MicroService.prototype.disconnectAndProcess =
     );
   };
 
-MicroService.prototype.validateClusterNode = function(next) {
-  if (this.isSystemNode) return next();
-  logger.verbose(
-    util.format('Validating cluster node with :id %s'), this.nodeId
-  );
+function _validateClusterNode(bag, next) {
+  if (bag.isSystemNode) return next();
 
-  this.publicAdapter.validateClusterNodeById(this.nodeId,
+  var who = bag.who + '|' + _validateClusterNode.name;
+  logger.debug(who, 'Inside');
+
+  bag.publicAdapter.validateClusterNodeById(bag.nodeId,
     function (err, clusterNode) {
       if (err) {
         logger.warn(
-          util.format('Failed to :validateClusterNodeById for id: %s',
-            this.nodeId)
+          util.format(who, 'failed to :validateClusterNodeById for id: %s',
+            bag.nodeId)
         );
-        return next(true);
+        bag.ackMessage = false;
+        return next();
       }
 
-      if (clusterNode.action === 'continue')
-        return next();
-      else
-        return next(true);
+      if (clusterNode.action !== 'continue')
+        bag.ackMessage = false;
+
+      return next();
     }
   );
-};
+}
 
-MicroService.prototype.validateSystemNode = function(next) {
-  if (!this.isSystemNode) return next();
-  logger.verbose(
-    util.format('Validating sytem node with :id %s'), this.nodeId
-  );
+function _validateSystemNode(bag, next) {
+  if (!bag.isSystemNode) return next();
 
-  this.publicAdapter.validateSystemNodeById(this.nodeId,
+  var who = bag.who + '|' + _validateSystemNode.name;
+  logger.debug(who, 'Inside');
+
+  bag.publicAdapter.validateSystemNodeById(bag.nodeId,
     function (err, systemNode) {
       if (err) {
         logger.warn(
-          util.format('Failed to :validateSystemNodeById for id: %s',
-            this.nodeId)
+          util.format(who, 'failed to :validateSystemNodeById for id: %s',
+            bag.nodeId)
         );
-        return next(true);
-      }
-
-      if (systemNode.action === 'continue')
+        bag.ackMessage = false;
         return next();
-      else
-        return next(true);
-    }
-  );
-};
-
-
-MicroService.prototype.checkPIDFile = function(next) {
-  logger.verbose('Checking existance of PID file');
-
-  fs.exists(this.pidFile,
-    function(exists) {
-      if (exists) {
-        logger.warn('PID file already exists, requeuing message');
-        return next(true);
       }
+
+      if (systemNode.action !== 'continue')
+        bag.ackMessage = false;
+
       return next();
     }
   );
-};
+}
 
-MicroService.prototype.createPIDFile = function(next) {
-  logger.verbose('Creating PID file');
+function _checkPIDFile(bag, next) {
+  if (!bag.ackMessage) return next();
 
-  var execContainerName = util.format('shippable-exec-%s', this.nodeId);
-  fs.outputFile(this.pidFile, execContainerName,
+  var who = bag.who + '|' + _checkPIDFile.name;
+  logger.debug(who, 'Inside');
+
+  fs.exists(bag.pidFile,
+    function (exists) {
+      if (exists) {
+        logger.warn(who, 'PID file already exists, message will be rejected');
+        bag.ackMessage = false;
+      }
+
+      return next();
+    }
+  );
+}
+
+function _createPIDFile(bag, next) {
+  if (!bag.ackMessage) return next();
+
+  var who = bag.who + '|' + _createPIDFile.name;
+  logger.debug(who, 'Inside');
+
+  var execContainerName = util.format('shippable-exec-%s', bag.nodeId);
+  fs.outputFile(bag.pidFile, execContainerName,
     function(err) {
       if (err) {
-        logger.warn(
-          util.format('Failed to create %s file', this.pidFile)
+        logger.warn(who,
+          util.format('failed to create %s PID file', this.pidFile)
         );
-        return next(true);
+        bag.ackMessage = false;
       }
+
       return next();
     }
   );
-};
+}
+
+function _unsubscribeFromQueue(bag, next) {
+  if (!bag.ackMessage) return next();
+
+  var who = bag.who + '|' + _unsubscribeFromQueue.name;
+  logger.debug(who, 'Inside');
+
+  bag.queue.unsubscribe(bag.consumerTag)
+    .addCallback(
+      function () {
+        return next();
+      }
+    );
+}
+
+function _ackMessage(bag, next) {
+  if (!bag.ackMessage) return next();
+
+  var who = bag.who + '|' + _ackMessage.name;
+  logger.debug(who, 'Inside');
+
+  bag.ack.acknowledge();
+  setTimeout(
+    function () {
+      return next();
+    },
+    bag.ackWaitTimeMS
+  );
+}
+
+function _rejectMessage(bag, next) {
+  if (bag.ackMessage) return next();
+
+  var who = bag.who + '|' + _rejectMessage.name;
+  logger.debug(who, 'Inside');
+
+  bag.ack.reject(true);
+  return next();
+}
