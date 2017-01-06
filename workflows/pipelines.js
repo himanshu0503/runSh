@@ -934,7 +934,25 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
       sanitizedDependencyName, dependency.operation)
   );
 
+  bag.commonEnvs.push(
+    util.format('%s_ID="%s"', sanitizedDependencyName, dependency.resourceId)
+  );
+
   if (dependency.version) {
+    _.each(_.keys(dependency.version.propertyBag),
+      function (key) {
+        var value = dependency.version.propertyBag[key];
+        if (_.isObject(value))
+          value = JSON.stringify(value);
+
+        bag.commonEnvs.push(util.format('%s_VERSION_%s="%s"',
+          sanitizedDependencyName,
+          key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+          value
+        ));
+      }
+    );
+
     var versionName = dependency.version.versionName || '';
     bag.commonEnvs.push(util.format('%s_VERSION_VERSIONNAME="%s"',
       sanitizedDependencyName,
@@ -943,6 +961,10 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
     bag.commonEnvs.push(util.format('%s_VERSION_VERSIONNUMBER="%s"',
       sanitizedDependencyName,
       dependency.version.versionNumber
+    ));
+    bag.commonEnvs.push(util.format('%s_VERSION_VERSIONID="%s"',
+      sanitizedDependencyName,
+      dependency.version.versionId
     ));
   }
 
