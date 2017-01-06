@@ -14,7 +14,7 @@ function Adapter(apiToken, jobId) {
   this.processStartTimeInMicroSec =
     processStartTime[0] * 1e6 + processStartTime[1] / 1e3;
   this.ShippableAdapter = new ShippableAdapter(apiToken);
-  this.batchSize = 10;
+  this.batchSize = 20;
   this.buffer = [];
   this.bufferTimeInterval = 3000;
   this.bufferTimer = null;
