@@ -942,8 +942,12 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
     _.each(_.keys(dependency.version.propertyBag),
       function (key) {
         var value = dependency.version.propertyBag[key];
-        if (_.isObject(value))
+        if (_.isObject(value)) {
           value = JSON.stringify(value);
+          // Escape spaces and single quotes
+          value = value.replace(/ /g, '\\ ');
+          value = value.replace(/'/g, '\\\'');
+        }
 
         bag.commonEnvs.push(util.format('%s_VERSION_%s="%s"',
           sanitizedDependencyName,
@@ -956,14 +960,58 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
     if (dependency.type === 'params')
       _.each(dependency.version.propertyBag.params,
         function (value, key) {
-          if (_.isObject(value))
+          if (_.isObject(value)) {
             value = JSON.stringify(value);
+            // Escape spaces and single quotes
+            value = value.replace(/ /g, '\\ ');
+            value = value.replace(/'/g, '\\\'');
 
-          bag.commonEnvs.push(util.format('%s_PARAMS_%s="%s"',
-            sanitizedDependencyName,
-            key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
-            value
-          ));
+            bag.commonEnvs.push(util.format('%s_PARAMS_%s="%s"',
+              sanitizedDependencyName,
+              key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+              value
+            ));
+          } else if (key === 'secure') {
+            var secureEnvs = value;
+            var index;
+
+            while ((index = secureEnvs.indexOf('=')) > -1) {
+              var secureKey, secureValue, secondHalf;
+              secureKey = secureEnvs.substring(0, index);
+              secondHalf = secureEnvs.substring(index + 1, secureEnvs.length);
+
+              var hasMoreEnvs = secondHalf.indexOf('=') > -1;
+              if (hasMoreEnvs) {
+                var temp = secondHalf.substring(0, secondHalf.indexOf('='));
+                var spaceIndex = temp.lastIndexOf(' ');
+                secureValue = secondHalf.substring(0, spaceIndex);
+                secureEnvs = secondHalf.substring(secureValue.length + 1,
+                  secureEnvs.length);
+              } else {
+                secureValue = secondHalf;
+                secureEnvs = '';
+              }
+
+              if (!_.isEmpty(secureKey)) {
+                if (secureValue[0] === '"' &&
+                  secureValue[secureValue.length - 1] === '"')
+                  secureValue = secureValue.substring(1,
+                    secureValue.length - 1);
+
+                bag.commonEnvs.push(util.format('%s_PARAMS_%s="%s"',
+                  sanitizedDependencyName,
+                  secureKey.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+                  secureValue
+                ));
+              }
+            }
+          } else {
+            bag.commonEnvs.push(util.format('%s_PARAMS_%s="%s"',
+              sanitizedDependencyName,
+              key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+              value
+            ));
+          }
         }
       );
 
@@ -987,8 +1035,12 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
       _.each(_.keys(dependency.propertyBag.yml.pointer),
         function (key) {
           var value = dependency.propertyBag.yml.pointer[key];
-          if (_.isObject(value))
+          if (_.isObject(value)) {
             value = JSON.stringify(value);
+            // Escape spaces and single quotes
+            value = value.replace(/ /g, '\\ ');
+            value = value.replace(/'/g, '\\\'');
+          }
 
           bag.commonEnvs.push(util.format('%s_POINTER_%s="%s"',
             sanitizedDependencyName,
@@ -1002,8 +1054,12 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
       _.each(_.keys(dependency.propertyBag.yml.seed),
         function (key) {
           var value = dependency.propertyBag.yml.seed[key];
-          if (_.isObject(value))
+          if (_.isObject(value)) {
             value = JSON.stringify(value);
+            // Escape spaces and single quotes
+            value = value.replace(/ /g, '\\ ');
+            value = value.replace(/'/g, '\\\'');
+          }
 
           bag.commonEnvs.push(util.format('%s_SEED_%s="%s"',
             sanitizedDependencyName,
@@ -1067,8 +1123,12 @@ function __getDependencyIntegrations(bag, dependency, next) {
       _.each(_.keys(integrationValues),
         function (key) {
           var value = integrationValues[key];
-          if (_.isObject(value))
+          if (_.isObject(value)) {
             value = JSON.stringify(value);
+            // Escape spaces and single quotes
+            value = value.replace(/ /g, '\\ ');
+            value = value.replace(/'/g, '\\\'');
+          }
 
           bag.commonEnvs.push(util.format('%s_INTEGRATION_%s="%s"',
             sanitizedDependencyName,
