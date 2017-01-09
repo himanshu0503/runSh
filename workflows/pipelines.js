@@ -953,6 +953,20 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
       }
     );
 
+    if (dependency.type === 'params')
+      _.each(dependency.version.propertyBag.params,
+        function (value, key) {
+          if (_.isObject(value))
+            value = JSON.stringify(value);
+
+          bag.commonEnvs.push(util.format('%s_PARAMS_%s="%s"',
+            sanitizedDependencyName,
+            key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
+            value
+          ));
+        }
+      );
+
     var versionName = dependency.version.versionName || '';
     bag.commonEnvs.push(util.format('%s_VERSION_VERSIONNAME="%s"',
       sanitizedDependencyName,
