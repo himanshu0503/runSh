@@ -20,6 +20,7 @@ var inMap = {
   loadBalancer: require('../resources/loadBalancer/inStep.js'),
   manifest: require('../resources/manifest/inStep.js'),
   params: require('../resources/params/inStep.js'),
+  provision: require('../resources/provision/inStep.js'),
   release: require('../resources/release/inStep.js'),
   replicas: require('../resources/replicas/inStep.js'),
   rSync: require('../resources/rSync/inStep.js'),
