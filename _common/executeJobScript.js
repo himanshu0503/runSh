@@ -167,6 +167,7 @@ function __readOnStartEnvs(bag, done) {
     return done();
   }
 
+  bag.putOnStartJobEnvs = true;
   var fileNames = fs.readdirSync(bag.jobEnvDir);
   if (_.isEmpty(fileNames)) {
     bag.readOnStartJobEnvs = false;
@@ -194,7 +195,6 @@ function __readOnStartEnvs(bag, done) {
     }
   );
   bag.readOnStartJobEnvs = false;
-  bag.putOnStartJobEnvs = true;
   return done();
 }
 
