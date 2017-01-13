@@ -162,6 +162,7 @@ function __readOnStartEnvs(bag, done) {
   var who = bag.who + '|' + __readOnStartEnvs.name;
   logger.debug(who, 'Inside');
 
+  bag.putOnStartJobEnvs = true;
   if (!fs.existsSync(bag.jobEnvDir)) {
     bag.readOnStartJobEnvs = false;
     return done();
@@ -194,7 +195,6 @@ function __readOnStartEnvs(bag, done) {
     }
   );
   bag.readOnStartJobEnvs = false;
-  bag.putOnStartJobEnvs = true;
   return done();
 }
 
