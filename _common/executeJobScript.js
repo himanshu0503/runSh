@@ -162,12 +162,12 @@ function __readOnStartEnvs(bag, done) {
   var who = bag.who + '|' + __readOnStartEnvs.name;
   logger.debug(who, 'Inside');
 
-  bag.putOnStartJobEnvs = true;
   if (!fs.existsSync(bag.jobEnvDir)) {
     bag.readOnStartJobEnvs = false;
     return done();
   }
 
+  bag.putOnStartJobEnvs = true;
   var fileNames = fs.readdirSync(bag.jobEnvDir);
   if (_.isEmpty(fileNames)) {
     bag.readOnStartJobEnvs = false;
