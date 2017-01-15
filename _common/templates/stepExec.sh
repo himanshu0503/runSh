@@ -60,6 +60,16 @@ on_failure() {
   <% }); %>
 }
 
+always() {
+  # adding : so that this isn't an empty function
+  :
+  <% _.each(obj.always, function(step) { %>
+    <% var cmdEscaped = step.replace(/\\/g, '\\\\')%>
+    <% cmdEscaped = cmdEscaped.replace(/'/g, "\\'") %>
+    eval $'<%= cmdEscaped %>'
+  <% }); %>
+}
+
 before_exit() {
   echo $1
   echo $2
@@ -72,6 +82,9 @@ before_exit() {
       exec_cmd on_failure
     } || true
   fi
+  {
+    exec_cmd always
+  } || true
 }
 
 trap before_exit EXIT
