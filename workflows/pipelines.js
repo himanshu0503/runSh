@@ -70,7 +70,6 @@ function pipelines(externalBag, callback) {
   bag.outputVersionFilePath = bag.buildRootDir + '/state/outputVersion.json';
   bag.stepMessageFilename = 'version.json';
   bag.subPrivateKeyPath = '/tmp/00_sub';
-  bag.runShName = 'runSh';
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
@@ -285,7 +284,8 @@ function _checkInputParams(bag, next) {
       consoleErrors.push(
         util.format('%s is missing: inPayload.propertyBag', who)
       );
-    bag.buildJobPropertyBag = bag.inPayload.propertyBag;
+    else
+      bag.buildJobPropertyBag = bag.inPayload.propertyBag;
 
     if (!_.isArray(bag.inPayload.dependencies))
       consoleErrors.push(
@@ -609,8 +609,7 @@ function _getSecrets(bag, next) {
 function _saveSubPrivateKey(bag, next) {
   if (bag.isPipelineJobCancelled) return next();
   if (bag.pipelineJobStatusCode) return next();
-  if (bag.inPayload.type !== bag.runShName) return next();
-
+  
   var who = bag.who + '|' + _saveSubPrivateKey.name;
   logger.verbose(who, 'Inside');
 
@@ -1326,31 +1325,28 @@ function __generateStepExecScript(bag, dependency, next) {
   var template = _.template(scriptContent);
 
   var on_success = [];
-  if (bag.inPayload.type === 'runSh')
-    _.each(bag.buildJobPropertyBag.yml.on_success,
-      function (step) {
-        if (_.has(step, 'script'))
-          on_success.push(step.script);
-      }
-    );
+  _.each(bag.buildJobPropertyBag.yml.on_success,
+    function (step) {
+      if (_.has(step, 'script'))
+        on_success.push(step.script);
+    }
+  );
 
   var on_failure = [];
-  if (bag.inPayload.type === 'runSh')
-    _.each(bag.buildJobPropertyBag.yml.on_failure,
-      function (step) {
-        if (_.has(step, 'script'))
-          on_failure.push(step.script);
-      }
-    );
+  _.each(bag.buildJobPropertyBag.yml.on_failure,
+    function (step) {
+      if (_.has(step, 'script'))
+        on_failure.push(step.script);
+    }
+  );
 
   var always = [];
-  if (bag.inPayload.type === 'runSh')
-    _.each(bag.buildJobPropertyBag.yml.always,
-      function (step) {
-        if (_.has(step, 'script'))
-          always.push(step.script);
-      }
-    );
+  _.each(bag.buildJobPropertyBag.yml.always,
+    function (step) {
+      if (_.has(step, 'script'))
+        always.push(step.script);
+    }
+  );
 
   var templateData = {
     scriptPath: strategyPath,
