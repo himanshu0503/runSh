@@ -50,6 +50,7 @@ function pipelines(externalBag, callback) {
       TASK: 'TASK',
       NOTIFY: 'NOTIFY'
     },
+    buildJobPropertyBag: {},
     outputVersion: {},
     nodeId: config.nodeId,
     isSystemNode: false,
@@ -69,7 +70,6 @@ function pipelines(externalBag, callback) {
   bag.outputVersionFilePath = bag.buildRootDir + '/state/outputVersion.json';
   bag.stepMessageFilename = 'version.json';
   bag.subPrivateKeyPath = '/tmp/00_sub';
-  bag.runShName = 'runSh';
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
     bag.isSystemNode = true;
@@ -112,6 +112,7 @@ function pipelines(externalBag, callback) {
       _destroyPIDFile.bind(null, bag),
       _updateBuildJobStatus.bind(null, bag),
       _sendCompleteMessage.bind(null, bag),
+      _sendAlwaysMessage.bind(null, bag),
       _updateResourceVersion.bind(null, bag),
       _updateBuildJobVersion.bind(null, bag),
       _updateBuildStatusAndVersion.bind(null, bag)
@@ -283,6 +284,8 @@ function _checkInputParams(bag, next) {
       consoleErrors.push(
         util.format('%s is missing: inPayload.propertyBag', who)
       );
+    else
+      bag.buildJobPropertyBag = bag.inPayload.propertyBag;
 
     if (!_.isArray(bag.inPayload.dependencies))
       consoleErrors.push(
@@ -470,7 +473,6 @@ function _getBuildJobPropertyBag(bag, next) {
   logger.verbose(who, 'Inside');
   bag.consoleAdapter.openCmd('Parsing job properties');
 
-  bag.buildJobPropertyBag = bag.inPayload.propertyBag;
   if (_.isEmpty(bag.buildJobPropertyBag.yml))
     bag.buildJobPropertyBag.yml = {};
 
@@ -607,8 +609,7 @@ function _getSecrets(bag, next) {
 function _saveSubPrivateKey(bag, next) {
   if (bag.isPipelineJobCancelled) return next();
   if (bag.pipelineJobStatusCode) return next();
-  if (bag.inPayload.type !== bag.runShName) return next();
-
+  
   var who = bag.who + '|' + _saveSubPrivateKey.name;
   logger.verbose(who, 'Inside');
 
@@ -1324,27 +1325,34 @@ function __generateStepExecScript(bag, dependency, next) {
   var template = _.template(scriptContent);
 
   var on_success = [];
-  if (bag.inPayload.type === 'runSh')
-    _.each(bag.buildJobPropertyBag.yml.on_success,
-      function (step) {
-        if (_.has(step, 'script'))
-          on_success.push(step.script);
-      }
-    );
+  _.each(bag.buildJobPropertyBag.yml.on_success,
+    function (step) {
+      if (_.has(step, 'script'))
+        on_success.push(step.script);
+    }
+  );
 
   var on_failure = [];
-  if (bag.inPayload.type === 'runSh')
-    _.each(bag.buildJobPropertyBag.yml.on_failure,
-      function (step) {
-        if (_.has(step, 'script'))
-          on_failure.push(step.script);
-      }
-    );
+  _.each(bag.buildJobPropertyBag.yml.on_failure,
+    function (step) {
+      if (_.has(step, 'script'))
+        on_failure.push(step.script);
+    }
+  );
+
+  var always = [];
+  _.each(bag.buildJobPropertyBag.yml.always,
+    function (step) {
+      if (_.has(step, 'script'))
+        always.push(step.script);
+    }
+  );
 
   var templateData = {
     scriptPath: strategyPath,
     on_success: on_success,
     on_failure: on_failure,
+    always: always,
     env: bag.commonEnvs
   };
 
@@ -1611,19 +1619,39 @@ function _updateBuildJobStatus(bag, next) {
 
 function _sendCompleteMessage(bag, next) {
   if (bag.isPipelineJobCancelled) return next();
+  if (!bag.buildJobPropertyBag.yml) return next();
 
   var who = bag.who + '|' + _sendCompleteMessage.name;
   logger.verbose(who, 'Inside');
 
-  bag.consoleAdapter.openCmd('Sending build job notification');
-
-  var event;
+  var event, notify = [];
 
   if (bag.pipelineJobStatusCode ===
-    __getStatusCodeByNameForPipelines(bag, 'success'))
-    event = 'on_success';
-  else
-    event = 'on_failure';
+    __getStatusCodeByNameForPipelines(bag, 'success') &&
+    !_.isEmpty(bag.buildJobPropertyBag.yml.on_success)) {
+    _.each(bag.buildJobPropertyBag.yml.on_success,
+       function (step) {
+         if (_.has(step, 'NOTIFY'))
+           notify.push(step.NOTIFY);
+       }
+     );
+     if (!_.isEmpty(notify)) event = 'on_success';
+  } else if (bag.pipelineJobStatusCode ===
+    __getStatusCodeByNameForPipelines(bag, 'failure') &&
+    !_.isEmpty(bag.buildJobPropertyBag.yml.on_failure)) {
+    _.each(bag.buildJobPropertyBag.yml.on_failure,
+      function (step) {
+        if (_.has(step, 'NOTIFY'))
+          notify.push(step.NOTIFY);
+        }
+      );
+    if (!_.isEmpty(notify)) event = 'on_failure';
+  }
+
+  if (!event) return next();
+
+  var msg = util.format('Sending %s notification', event);
+  bag.consoleAdapter.openCmd(msg);
 
   var message = {
     where: 'core.nf',
@@ -1634,7 +1662,6 @@ function _sendCompleteMessage(bag, next) {
     }
   };
 
-  var msg;
   bag.builderApiAdapter.postToVortex(message,
     function (err) {
       if (err) {
@@ -1644,6 +1671,52 @@ function _sendCompleteMessage(bag, next) {
         bag.consoleAdapter.closeCmd(false);
       } else {
         msg = util.format('Successfully sent %s message', event);
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(true);
+      }
+      return next();
+    }
+  );
+}
+
+function _sendAlwaysMessage(bag, next) {
+  if (bag.isPipelineJobCancelled) return next();
+  if (!bag.buildJobPropertyBag.yml) return next();
+  if (_.isEmpty(bag.buildJobPropertyBag.yml.always)) return next();
+
+  var notify = [];
+  _.each(bag.buildJobPropertyBag.yml.always,
+    function (step) {
+      if (_.has(step, 'NOTIFY'))
+        notify.push(step.NOTIFY);
+    }
+  );
+  if (_.isEmpty(notify)) return next();
+
+  var who = bag.who + '|' + _sendAlwaysMessage.name;
+  logger.verbose(who, 'Inside');
+
+  bag.consoleAdapter.openCmd('Sending always notification');
+
+  var message = {
+    where: 'core.nf',
+    payload: {
+      objectType: 'buildJob',
+      objectId: bag.buildJobId,
+      event: 'always'
+    }
+  };
+
+  bag.builderApiAdapter.postToVortex(message,
+    function (err) {
+      var msg;
+      if (err) {
+        msg = util.format('%s, Failed to send always message with ' +
+          'error %s',who, err);
+        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.closeCmd(false);
+      } else {
+        msg = util.format('Successfully sent always message');
         bag.consoleAdapter.publishMsg(msg);
         bag.consoleAdapter.closeCmd(true);
       }
