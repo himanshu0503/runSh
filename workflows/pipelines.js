@@ -110,12 +110,8 @@ function pipelines(externalBag, callback) {
       _saveStepState.bind(null, bag),
       _getOutputVersion.bind(null, bag),
       _destroyPIDFile.bind(null, bag),
-      _updateBuildJobStatus.bind(null, bag),
-      _sendCompleteMessage.bind(null, bag),
-      _sendAlwaysMessage.bind(null, bag),
       _updateResourceVersion.bind(null, bag),
-      _updateBuildJobVersion.bind(null, bag),
-      _updateBuildStatusAndVersion.bind(null, bag)
+      _updateBuildJobStatusAndVersion.bind(null, bag),
     ],
     function (err) {
       return callback(err);
@@ -609,7 +605,7 @@ function _getSecrets(bag, next) {
 function _saveSubPrivateKey(bag, next) {
   if (bag.isPipelineJobCancelled) return next();
   if (bag.pipelineJobStatusCode) return next();
-  
+
   var who = bag.who + '|' + _saveSubPrivateKey.name;
   logger.verbose(who, 'Inside');
 
@@ -1582,149 +1578,6 @@ function _destroyPIDFile(bag, next) {
   );
 }
 
-function _updateBuildJobStatus(bag, next) {
-  if (bag.isPipelineJobCancelled) return next();
-
-  bag.consoleAdapter.openCmd('Updating build job status');
-
-  var who = bag.who + '|' + _updateBuildJobStatus.name;
-  logger.verbose(who, 'Inside');
-
-  var update = {};
-
-  //pipelineJobStatusCode is only set to failure/error, so if we reach this
-  // function without any code we know job has succeeded
-  if (!bag.pipelineJobStatusCode)
-    bag.pipelineJobStatusCode =
-      __getStatusCodeByNameForPipelines(bag, 'success');
-
-  update.statusCode = bag.pipelineJobStatusCode;
-
-  bag.builderApiAdapter.putBuildJobById(bag.buildJobId, update,
-    function(err) {
-      if (err) {
-        var msg = util.format('%s, failed to :putBuildJobById for ' +
-          'buildJobId: %s with err: %s', who, bag.buildJobId, err);
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(false);
-      } else {
-        bag.consoleAdapter.publishMsg('Successfully updated build ' +
-          'job status');
-        bag.consoleAdapter.closeCmd(true);
-      }
-      return next();
-    }
-  );
-}
-
-function _sendCompleteMessage(bag, next) {
-  if (bag.isPipelineJobCancelled) return next();
-  if (!bag.buildJobPropertyBag.yml) return next();
-
-  var who = bag.who + '|' + _sendCompleteMessage.name;
-  logger.verbose(who, 'Inside');
-
-  var event, notify = [];
-
-  if (bag.pipelineJobStatusCode ===
-    __getStatusCodeByNameForPipelines(bag, 'success') &&
-    !_.isEmpty(bag.buildJobPropertyBag.yml.on_success)) {
-    _.each(bag.buildJobPropertyBag.yml.on_success,
-       function (step) {
-         if (_.has(step, 'NOTIFY'))
-           notify.push(step.NOTIFY);
-       }
-     );
-     if (!_.isEmpty(notify)) event = 'on_success';
-  } else if (bag.pipelineJobStatusCode ===
-    __getStatusCodeByNameForPipelines(bag, 'failure') &&
-    !_.isEmpty(bag.buildJobPropertyBag.yml.on_failure)) {
-    _.each(bag.buildJobPropertyBag.yml.on_failure,
-      function (step) {
-        if (_.has(step, 'NOTIFY'))
-          notify.push(step.NOTIFY);
-        }
-      );
-    if (!_.isEmpty(notify)) event = 'on_failure';
-  }
-
-  if (!event) return next();
-
-  var msg = util.format('Sending %s notification', event);
-  bag.consoleAdapter.openCmd(msg);
-
-  var message = {
-    where: 'core.nf',
-    payload: {
-      objectType: 'buildJob',
-      objectId: bag.buildJobId,
-      event: event
-    }
-  };
-
-  bag.builderApiAdapter.postToVortex(message,
-    function (err) {
-      if (err) {
-        msg = util.format('%s, Failed to send %s message with ' +
-          'error %s',who, event, err);
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(false);
-      } else {
-        msg = util.format('Successfully sent %s message', event);
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(true);
-      }
-      return next();
-    }
-  );
-}
-
-function _sendAlwaysMessage(bag, next) {
-  if (bag.isPipelineJobCancelled) return next();
-  if (!bag.buildJobPropertyBag.yml) return next();
-  if (_.isEmpty(bag.buildJobPropertyBag.yml.always)) return next();
-
-  var notify = [];
-  _.each(bag.buildJobPropertyBag.yml.always,
-    function (step) {
-      if (_.has(step, 'NOTIFY'))
-        notify.push(step.NOTIFY);
-    }
-  );
-  if (_.isEmpty(notify)) return next();
-
-  var who = bag.who + '|' + _sendAlwaysMessage.name;
-  logger.verbose(who, 'Inside');
-
-  bag.consoleAdapter.openCmd('Sending always notification');
-
-  var message = {
-    where: 'core.nf',
-    payload: {
-      objectType: 'buildJob',
-      objectId: bag.buildJobId,
-      event: 'always'
-    }
-  };
-
-  bag.builderApiAdapter.postToVortex(message,
-    function (err) {
-      var msg;
-      if (err) {
-        msg = util.format('%s, Failed to send always message with ' +
-          'error %s',who, err);
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(false);
-      } else {
-        msg = util.format('Successfully sent always message');
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(true);
-      }
-      return next();
-    }
-  );
-}
-
 function _updateResourceVersion(bag, next) {
   if (bag.isPipelineJobCancelled) return next();
   if (!bag.resourceId) return next();
@@ -1773,70 +1626,37 @@ function _updateResourceVersion(bag, next) {
   );
 }
 
-function _updateBuildJobVersion(bag, next) {
+function _updateBuildJobStatusAndVersion(bag, next) {
   if (bag.isPipelineJobCancelled) return next();
-  if (!bag.version || !bag.version.id) return next();
 
-  bag.consoleAdapter.openCmd('Updating version in build job');
+  bag.consoleAdapter.openCmd('Updating build job status & version');
 
-  var who = bag.who + '|' + _updateBuildJobVersion.name;
+  var who = bag.who + '|' + _updateBuildJobStatusAndVersion.name;
   logger.verbose(who, 'Inside');
 
-  var update = {
-    versionId: bag.version.id
-  };
+  var update = {};
 
-  var msg;
+  // pipelineJobStatusCode is only set to failure/error, so if we reach this
+  // function without any code we know job has succeeded
+  if (!bag.pipelineJobStatusCode)
+    bag.pipelineJobStatusCode =
+      __getStatusCodeByNameForPipelines(bag, 'success');
+
+  update.statusCode = bag.pipelineJobStatusCode;
+  if (bag.version)
+    update.versionId = bag.version.id;
+
   bag.builderApiAdapter.putBuildJobById(bag.buildJobId, update,
     function(err) {
       if (err) {
-        msg = util.format('%s, Failed to updated version for ' +
+        var msg = util.format('%s, failed to :putBuildJobById for ' +
           'buildJobId: %s with err: %s', who, bag.buildJobId, err);
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(false);
-      } else  {
-        msg = util.format('Successfully updated version in ' +
-          'build job to %s', update.versionId);
-        bag.consoleAdapter.publishMsg(msg);
-        bag.consoleAdapter.closeCmd(true);
-      }
-      return next();
-    }
-  );
-}
-
-function _updateBuildStatusAndVersion(bag, next) {
-  if (bag.isPipelineJobCancelled) return next();
-  if (!bag.buildId) return next();
-
-  var who = bag.who + '|' + _updateBuildStatusAndVersion.name;
-  logger.verbose(who, 'Inside');
-
-  bag.consoleAdapter.openCmd('Updating build status');
-
-  var versionId;
-
-  if (bag.version)
-    versionId = bag.version.id;
-
-  var update = {
-    versionId: versionId
-  };
-
-  update.statusCode = bag.pipelineJobStatusCode;
-
-  var msg;
-  bag.builderApiAdapter.putBuildById(bag.buildId, update,
-    function(err) {
-      if (err) {
-        msg = util.format('%s, Failed to :putBuildById for ' +
-          'buildId: %s with err: %s', who, bag.buildId, err);
         bag.consoleAdapter.publishMsg(msg);
         bag.consoleAdapter.closeCmd(false);
         bag.consoleAdapter.closeGrp(false);
       } else {
-        msg = util.format('Successfully updated build status');
-        bag.consoleAdapter.publishMsg(msg);
+        bag.consoleAdapter.publishMsg('Successfully updated buildJob status ' +
+          '& version');
         bag.consoleAdapter.closeCmd(true);
         bag.consoleAdapter.closeGrp(true);
       }

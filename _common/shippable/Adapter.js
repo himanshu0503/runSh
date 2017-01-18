@@ -227,15 +227,6 @@ ShippableAdapter.prototype.postToSUVortex =
 
 //#######################  PUT  by alphabetical order  ########################
 
-ShippableAdapter.prototype.putBuildById =
-  function (id, json, callback) {
-    this.put(
-      util.format('/builds/%s', id),
-      json,
-      callback
-    );
-  };
-
 ShippableAdapter.prototype.putBuildJobById =
   function (id, json, callback) {
     this.put(
