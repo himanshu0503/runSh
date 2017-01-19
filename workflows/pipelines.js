@@ -1592,6 +1592,11 @@ function _updateResourceVersion(bag, next) {
     projectId: bag.projectId,
     propertyBag: {}
   };
+  // pipelineJobStatusCode is only set to failure/error, so if we reach this
+  // function without any code we know job has succeeded
+  if (!bag.pipelineJobStatusCode)
+    bag.pipelineJobStatusCode =
+      __getStatusCodeByNameForPipelines(bag, 'success');
 
   if (bag.pipelineJobStatusCode ===
     __getStatusCodeByNameForPipelines(bag, 'success') &&
@@ -1599,6 +1604,7 @@ function _updateResourceVersion(bag, next) {
     resource.versionTrigger = true;
   else
     resource.versionTrigger = false;
+  bag.isGrpSuccess = true;
 
   if (bag.outputVersion)
     _.extend(resource,  bag.outputVersion);
@@ -1614,6 +1620,7 @@ function _updateResourceVersion(bag, next) {
           'resourceId: %s with err: %s', who, bag.resourceId, err);
         bag.consoleAdapter.publishMsg(msg);
         bag.consoleAdapter.closeCmd(false);
+        bag.isGrpSuccess = false;
       } else {
         bag.version = version;
         msg = util.format('Successfully posted version:%s for ' +
@@ -1636,12 +1643,6 @@ function _updateBuildJobStatusAndVersion(bag, next) {
 
   var update = {};
 
-  // pipelineJobStatusCode is only set to failure/error, so if we reach this
-  // function without any code we know job has succeeded
-  if (!bag.pipelineJobStatusCode)
-    bag.pipelineJobStatusCode =
-      __getStatusCodeByNameForPipelines(bag, 'success');
-
   update.statusCode = bag.pipelineJobStatusCode;
   if (bag.version)
     update.versionId = bag.version.id;
@@ -1653,13 +1654,13 @@ function _updateBuildJobStatusAndVersion(bag, next) {
           'buildJobId: %s with err: %s', who, bag.buildJobId, err);
         bag.consoleAdapter.publishMsg(msg);
         bag.consoleAdapter.closeCmd(false);
-        bag.consoleAdapter.closeGrp(false);
+        bag.isGrpSuccess = false;
       } else {
         bag.consoleAdapter.publishMsg('Successfully updated buildJob status ' +
           '& version');
         bag.consoleAdapter.closeCmd(true);
-        bag.consoleAdapter.closeGrp(true);
       }
+      bag.consoleAdapter.closeGrp(bag.isGrpSuccess);
       return next();
     }
   );
