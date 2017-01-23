@@ -1433,7 +1433,8 @@ function _createComposition(bag, next) {
     function (dependency) {
       return {
         versionId: dependency.version && dependency.version.versionId,
-        name: dependency.name
+        name: dependency.name,
+        operation: dependency.operation
       };
     }
   );
