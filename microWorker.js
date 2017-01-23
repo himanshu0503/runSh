@@ -46,12 +46,15 @@ function _checkInputParams(bag, next) {
   if (bag.rawMessage.jobId) {
     bag.workflow = 'ci';
     bag.consoleAdapter = new JobConsoleAdapter(bag.rawMessage.builderApiToken,
-      bag.rawMessage.jobId);
+      bag.rawMessage.jobId, bag.rawMessage.consoleBatchSize,
+      bag.rawMessage.consoleBufferTimeIntervalInMS);
   } else if (bag.rawMessage.payload && bag.rawMessage.payload.buildJobId) {
     bag.workflow = 'pipelines';
     bag.consoleAdapter = new BuildJobConsoleAdapter(
-      bag.rawMessage.builderApiToken,
-      bag.rawMessage.payload.buildJobId);
+      bag.rawMessage.builderApiToken, bag.rawMessage.payload.buildJobId,
+      bag.rawMessage.payload.consoleBatchSize,
+      bag.rawMessage.payload.consoleBufferTimeIntervalInMS
+    );
   } else {
     logger.warn(util.inspect('%s, No jobId/buildJobId present' +
       ' in incoming message', who));

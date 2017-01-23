@@ -6,7 +6,7 @@ module.exports = self;
 var uuid = require('node-uuid');
 var ShippableAdapter = require('./shippable/Adapter.js');
 
-function Adapter(apiToken, jobId) {
+function Adapter(apiToken, jobId, consoleBatchSize, consoleBufferTimeInMS) {
   this.who = 'runSh|_common|jobConsoleAdapter|jobId:' + jobId;
   this.jobId = jobId;
   this.startTimeInMicroSec = new Date().getTime() * 1000;
@@ -14,9 +14,9 @@ function Adapter(apiToken, jobId) {
   this.processStartTimeInMicroSec =
     processStartTime[0] * 1e6 + processStartTime[1] / 1e3;
   this.ShippableAdapter = new ShippableAdapter(apiToken);
-  this.batchSize = 20;
+  this.batchSize = consoleBatchSize || 20;
   this.buffer = [];
-  this.bufferTimeInterval = 3000;
+  this.bufferTimeInterval = consoleBufferTimeInMS || 3000;
   this.bufferTimer = null;
   this.pendingApiCalls = 0;
   this.messageWithNoParentConsole = [];

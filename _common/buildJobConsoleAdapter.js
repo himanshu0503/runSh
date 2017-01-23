@@ -6,14 +6,14 @@ module.exports = self;
 var uuid = require('node-uuid');
 var ShippableAdapter = require('./shippable/Adapter.js');
 
-function Adapter(apiToken, buildJobId) {
+function Adapter(apiToken, buildJobId, consoleBatchSize, consoleBufferTimeInMS) {
   this.who = 'runSh|_common|buildJobConsoleAdapter|buildJobId:' + buildJobId;
   this.buildJobId = buildJobId;
   this.timestamp = new Date().getTime() * 1000;
   this.ShippableAdapter = new ShippableAdapter(apiToken);
-  this.batchSize = 10;
+  this.batchSize = consoleBatchSize || 20;
   this.buffer = [];
-  this.bufferTimeInterval = 3000;
+  this.bufferTimeInterval = consoleBufferTimeInMS || 3000;
   this.bufferTimer = null;
   this.pendingApiCalls = 0;
 }
