@@ -191,7 +191,8 @@ function __readOnStartEnvs(bag, done) {
   _.each(validJSONFiles,
     function(fileName) {
       var json = fs.readFileSync(fileName, 'utf8');
-      bag.onStartJobEnvs.push(json);
+      var parsedJSON = __parseBody(json);
+      bag.onStartJobEnvs.push(parsedJSON);
     }
   );
   bag.readOnStartJobEnvs = false;
@@ -254,4 +255,18 @@ function __parseLogLine(bag, line) {
   } else if (!_.contains(messagesNotToBePosted, lineSplit[0])) {
     bag.consoleAdapter.publishMsg(line);
   }
+}
+
+function __parseBody(body) {
+  var parsedBody = {};
+  if (typeof body === 'object') {
+    parsedBody = body;
+  } else {
+    try {
+      parsedBody = JSON.parse(body);
+    } catch (e) {
+      parsedBody.message = 'Could not parse body';
+    }
+  }
+  return parsedBody;
 }
