@@ -937,7 +937,7 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
   );
 
   if (dependency.version) {
-    if (dependency.type === 'params')
+    if (dependency.type === 'params') {
       _.each(dependency.version.propertyBag.params,
         function (value, key) {
           if (_.isObject(value)) {
@@ -997,6 +997,58 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
           }
         }
       );
+    } else if (dependency.type === 'gitRepo') {
+      if (dependency.version.propertyBag &&
+        dependency.version.propertyBag.shaData) {
+        var shaData = dependency.version.propertyBag.shaData;
+
+        bag.commonEnvs.push(util.format('%s_BRANCH=%s',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.branchName)
+        ));
+        bag.commonEnvs.push(util.format('%s_BASE_BRANCH=%s',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.baseCommitRef)
+        ));
+        bag.commonEnvs.push(util.format('%s_HEAD_BRANCH=%s',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.headCommitRef || '')
+        ));
+        bag.commonEnvs.push(util.format('%s_PULL_REQUEST=%s',
+          sanitizedDependencyName, shaData.pullRequestNumber || false
+        ));
+        bag.commonEnvs.push(util.format('%s_COMMIT=%s',
+          sanitizedDependencyName, shaData.commitSha
+        ));
+        bag.commonEnvs.push(util.format('%s_COMMITTER="%s"',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.committer &&
+            shaData.committer.displayName)
+        ));
+        bag.commonEnvs.push(util.format('%s_COMMIT_MESSAGE="%s"',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.commitMessage)
+        ));
+        bag.commonEnvs.push(util.format('%s_IS_GIT_TAG=%s',
+          sanitizedDependencyName, shaData.isGitTag
+        ));
+        bag.commonEnvs.push(util.format('%s_GIT_TAG_NAME="%s"',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.gitTagName)
+        ));
+        bag.commonEnvs.push(util.format('%s_IS_RELEASE=%s',
+          sanitizedDependencyName, shaData.isRelease
+        ));
+        bag.commonEnvs.push(util.format('%s_RELEASE_NAME="%s"',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.releaseName)
+        ));
+        bag.commonEnvs.push(util.format('%s_RELEASED_AT="%s"',
+          sanitizedDependencyName,
+          ___escapeEnvironmentVariable(shaData.releasedAt)
+        ));
+      }
+    }
 
     var versionName = dependency.version.versionName || '';
     versionName = ___escapeEnvironmentVariable(versionName);
