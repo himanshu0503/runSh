@@ -1067,45 +1067,21 @@ function __addDependencyEnvironmentVariables(bag, dependency, next) {
   }
 
   if (dependency.propertyBag.yml) {
-    if (dependency.propertyBag.yml.pointer)
-      _.each(_.keys(dependency.propertyBag.yml.pointer),
-        function (key) {
-          var value = dependency.propertyBag.yml.pointer[key];
-          if (_.isObject(value)) {
-            value = JSON.stringify(value);
-            // Escape spaces
-            value = value.replace(/ /g, '\\ ');
-          }
+    var sourceName = dependency.propertyBag.yml.pointer &&
+      dependency.propertyBag.yml.pointer.sourceName;
+    if (sourceName)
+      bag.commonEnvs.push(util.format('%s_SOURCENAME="%s"',
+        sanitizedDependencyName,
+        ___escapeEnvironmentVariable(sourceName)
+      ));
 
-          value = ___escapeEnvironmentVariable(value);
-
-          bag.commonEnvs.push(util.format('%s_POINTER_%s="%s"',
-            sanitizedDependencyName,
-            key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
-            value
-          ));
-        }
-      );
-
-    if (dependency.propertyBag.yml.seed)
-      _.each(_.keys(dependency.propertyBag.yml.seed),
-        function (key) {
-          var value = dependency.propertyBag.yml.seed[key];
-          if (_.isObject(value)) {
-            value = JSON.stringify(value);
-            // Escape spaces
-            value = value.replace(/ /g, '\\ ');
-          }
-
-          value = ___escapeEnvironmentVariable(value);
-
-          bag.commonEnvs.push(util.format('%s_SEED_%s="%s"',
-            sanitizedDependencyName,
-            key.replace(/[^A-Za-z0-9_]/g, '').toUpperCase(),
-            value
-          ));
-        }
-      );
+    var seedVersionName = dependency.propertyBag.yml.seed &&
+      dependency.propertyBag.yml.seed.versionName;
+    if (seedVersionName)
+      bag.commonEnvs.push(util.format('%s_SEED_VERSIONNAME="%s"',
+        sanitizedDependencyName,
+        ___escapeEnvironmentVariable(seedVersionName)
+      ));
   }
 
   return next();
