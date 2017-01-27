@@ -136,7 +136,7 @@ function __readSSHKeys(bag, done) {
   var fileNames = fs.readdirSync(bag.sshDir);
 
   var fileNameWithLocation = _.map(fileNames,
-    function(fileName) {
+    function (fileName) {
       return path.join(bag.sshDir, fileName);
     }
   );
@@ -145,7 +145,7 @@ function __readSSHKeys(bag, done) {
   bag.sshAddFragment = '';
 
   _.each(fileNameWithLocation,
-    function(fileName) {
+    function (fileName) {
       bag.sshAddFragment = bag.sshAddFragment + 'ssh-add ' + fileName + ';';
     }
   );
