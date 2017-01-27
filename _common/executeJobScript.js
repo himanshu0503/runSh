@@ -22,7 +22,8 @@ function executeJobScript(externalBag, callback) {
     rawMessage: externalBag.rawMessage,
     cexecMessageNameWithLocation: externalBag.cexecMessageNameWithLocation,
     sshDir: externalBag.sshDir,
-    tmpFile: '/tmp/mexec/tmp-script.sh'
+    tmpFile: '/tmp/mexec/tmp-script.sh',
+    sshAddFragment: ''
   };
 
   bag.who = 'runSh|_common|' + self.name;
@@ -133,24 +134,31 @@ function __readSSHKeys(bag, done) {
   var who = bag.who + '|' + __readSSHKeys.name;
   logger.debug(who, 'Inside');
 
-  var fileNames = fs.readdirSync(bag.sshDir);
+  fs.readdir(bag.sshDir,
+    function (err, fileNames) {
+      if (err) {
+        var msg = util.format('%s, Failed with err:%s', who, err);
+        bag.consoleAdapter.publishMsg(msg);
+        return done(err);
+      }
+      var fileNameWithLocation = _.map(fileNames,
+        function (fileName) {
+          return path.join(bag.sshDir, fileName);
+        }
+      );
 
-  var fileNameWithLocation = _.map(fileNames,
-    function (fileName) {
-      return path.join(bag.sshDir, fileName);
+      fileNameWithLocation = fileNameWithLocation.sort();
+      bag.sshAddFragment = '';
+
+      _.each(fileNameWithLocation,
+        function (fileName) {
+          bag.sshAddFragment = bag.sshAddFragment + 'ssh-add ' + fileName + ';';
+        }
+      );
+
+      return done();
     }
   );
-
-  fileNameWithLocation = fileNameWithLocation.sort();
-  bag.sshAddFragment = '';
-
-  _.each(fileNameWithLocation,
-    function (fileName) {
-      bag.sshAddFragment = bag.sshAddFragment + 'ssh-add ' + fileName + ';';
-    }
-  );
-
-  return done();
 }
 
 function __generateExecScript(bag, done) {
