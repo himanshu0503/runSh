@@ -100,8 +100,8 @@ function _generateExecScript(bag, next) {
   if (!bag.scriptTaskSteps) return next();
 
   var scriptContent =
-    util.format('ssh-agent /bin/bash -c \'ssh-add %s; %s',
-      bag.subscriptionKeyPath, bag.scriptsPath + '\'');
+    util.format('ssh-agent /bin/bash -c \'ssh-add %s; %s \'',
+      bag.subscriptionKeyPath, bag.scriptsPath);
 
   fs.outputFile(bag.executeScriptPath, scriptContent,
     function (err) {

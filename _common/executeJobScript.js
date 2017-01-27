@@ -161,8 +161,8 @@ function __generateExecScript(bag, done) {
   logger.debug(who, 'Inside');
 
   var scriptContent =
-    util.format('ssh-agent /bin/bash -c \'%s %s',
-      bag.sshAddFragment, bag.tmpFile + '\'');
+    util.format('ssh-agent /bin/bash -c \'%s %s \'',
+      bag.sshAddFragment, bag.tmpFile);
 
   fs.outputFile(bag.mexecFileNameWithPath, scriptContent,
     function (err) {
