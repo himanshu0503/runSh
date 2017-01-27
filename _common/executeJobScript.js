@@ -20,7 +20,9 @@ function executeJobScript(externalBag, callback) {
     putOnStartJobEnvs: false,
     onStartJobEnvs: [],
     rawMessage: externalBag.rawMessage,
-    cexecMessageNameWithLocation: externalBag.cexecMessageNameWithLocation
+    cexecMessageNameWithLocation: externalBag.cexecMessageNameWithLocation,
+    sshDir: externalBag.sshDir,
+    tmpFile: '/tmp/mexec/tmp-script.sh'
   };
 
   bag.who = 'runSh|_common|' + self.name;
@@ -57,6 +59,8 @@ function _executeSteps(bag, next) {
       async.series([
           __writeCexecStepsToFile.bind(null, bag),
           __writeStepToFile.bind(null, bag),
+          __readSSHKeys.bind(null, bag),
+          __generateExecScript.bind(null, bag),
           __executeTask.bind(null, bag),
           __readOnStartEnvs.bind(null, bag),
           __putOnStartEnvsInJob.bind(null, bag)
@@ -108,8 +112,59 @@ function __writeStepToFile(bag, done) {
   var who = bag.who + '|' + __writeStepToFile.name;
   logger.debug(who, 'Inside');
 
-  fs.writeFile(bag.mexecFileNameWithPath,
+  fs.writeFile(bag.tmpFile,
     bag.currentStep.script,
+    function (err) {
+      if (err) {
+        var msg = util.format('%s, Failed with err:%s', who, err);
+        bag.consoleAdapter.publishMsg(msg);
+        return done(err);
+      }
+      fs.chmodSync(bag.tmpFile, '755');
+      return done();
+    }
+  );
+}
+
+function __readSSHKeys(bag, done) {
+  if (!bag.continueNextStep) return done();
+  if (bag.currentStep.who !== 'mexec') return done();
+
+  var who = bag.who + '|' + __readSSHKeys.name;
+  logger.debug(who, 'Inside');
+
+  var fileNames = fs.readdirSync(bag.sshDir);
+
+  var fileNameWithLocation = _.map(fileNames,
+    function(fileName) {
+      return path.join(bag.sshDir, fileName);
+    }
+  );
+
+  fileNameWithLocation = fileNameWithLocation.sort();
+  bag.sshAddFragment = '';
+
+  _.each(fileNameWithLocation,
+    function(fileName) {
+      bag.sshAddFragment = bag.sshAddFragment + 'ssh-add ' + fileName + ';';
+    }
+  );
+
+  return done();
+}
+
+function __generateExecScript(bag, done) {
+  if (!bag.continueNextStep) return done();
+  if (bag.currentStep.who !== 'mexec') return done();
+
+  var who = bag.who + '|' + __generateExecScript.name;
+  logger.debug(who, 'Inside');
+
+  var scriptContent =
+    util.format('ssh-agent /bin/bash -c \'%s %s',
+      bag.sshAddFragment, bag.tmpFile + '\'');
+
+  fs.outputFile(bag.mexecFileNameWithPath, scriptContent,
     function (err) {
       if (err) {
         var msg = util.format('%s, Failed with err:%s', who, err);

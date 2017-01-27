@@ -23,7 +23,7 @@ function ci(externalBag, callback) {
     cexecDir: '/tmp/cexec',
     cexecMessageName: 'message.json',
     artifactsDir: '/shippableci',
-    onStartEnvDir: 'onstartjobenvs',
+    onStartEnvDir: 'onstartjobenvs'
   };
 
   if (parseInt(global.config.nodeTypeCode) === global.nodeTypeCodes.system)
@@ -392,7 +392,8 @@ function _executeCIJob(bag, next) {
     builderApiAdapter: bag.builderApiAdapter,
     rawMessage: bag.rawMessage,
     cexecMessageNameWithLocation: path.join(bag.cexecDir,
-      bag.cexecMessageName)
+      bag.cexecMessageName),
+    sshDir: bag.sshDir
   };
 
   executeJobScript(scriptBag,
